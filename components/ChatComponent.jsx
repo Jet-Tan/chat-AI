@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import axios from "axios";
 import EventSource from "react-native-sse";
-
+import { MaterialIcons } from "@expo/vector-icons";
 const CHAT_PHP_url =
   "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat";
 const prompts_name = "Riokupon AI";
@@ -47,9 +47,9 @@ const ChatComponent = () => {
         isImg: false,
         date: currentDate(),
       };
-      setArrayChat((prev) => [...prev, newChat]);
+      setArrayChat((prev) => [...prev, newChat]); // Thêm tin nhắn người dùng vào arrayChat
       scrollChatBottom();
-      getResponse(chat);
+      getResponse(chat); // Gọi API để nhận phản hồi từ chatbot
     }
   };
 
@@ -62,9 +62,13 @@ const ChatComponent = () => {
     const eventSource = new EventSource(url, defaultOptions);
     let buffer = "";
 
+    eventSource.onopen = () => console.log("EventSource connection opened");
+    eventSource.onerror = (error) => console.log("EventSource error:", error);
+
     eventSource.addEventListener("message", (event) => {
+      console.log("Received event data:", event.data);
       buffer += event.data;
-      let messages = buffer.split(/\r?\n\r?\n/);
+      let messages = buffer.split(/\r?\n\r?\n/); // Tách tin nhắn dựa trên kết thúc dòng
       buffer = messages.pop() || "";
       messages.forEach((message) => {
         if (message.trim()) {
@@ -72,7 +76,6 @@ const ChatComponent = () => {
         }
       });
     });
-
     return eventSource;
   };
 
@@ -94,77 +97,52 @@ const ChatComponent = () => {
     params.append("is_mod", "0");
 
     try {
-      const randomID = generateUniqueID();
-      const source = createCustomEventSource(CHAT_PHP_url, {
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-        body: params.toString(),
+      const response = await axios.post(CHAT_PHP_url, params.toString(), {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
       });
 
-      streamChatCoze(source, randomID);
+      // Nếu API trả về thành công, xử lý phản hồi
+      streamChatCoze(response.data); // Sử dụng dữ liệu phản hồi
+      console.log("Response from API:", response.data);
     } catch (e) {
       console.error(`Error creating SSE: ${e}`);
       enableChat();
     }
   };
 
-  const streamChatCoze = (source, randomID) => {
+  const streamChatCoze = (data) => {
     let fullPrompt = "";
-    let hasResponded = false;
 
-    source.addEventListener("message", (event) => {
-      if (hasResponded) return;
+    try {
+      const tokens = JSON.stringify(data);
+      const messageContent = tokens.message?.content || "";
+      fullPrompt += messageContent;
 
-      const data = event.data;
+      // Cập nhật arrayChat ngay khi chatbot trả về một phần phản hồi
+      setArrayChat((prev) => {
+        const newArray = [...prev];
+        const assistantMessage = {
+          name: prompts_name,
+          message: fullPrompt,
+          isImg: false,
+          date: currentDate(),
+        };
+        return [...newArray, assistantMessage];
+      });
 
-      if (data === null || data === undefined) {
-        console.warn("Received null or undefined data");
-        return;
-      }
+      scrollChatBottom();
 
-      if (data.startsWith("[ERROR]")) {
-        alert(data.substr("[ERROR]".length).trim());
-        enableChat();
-        return;
-      } else if (data.startsWith("[SUCCESS]")) {
-        alert(data.substr("[SUCCESS]".length).trim());
-        enableChat();
-        return;
-      } else if (data === '{"event":"done"}') {
-        enableChat();
-        source.close();
-        hasResponded = true;
-        return;
-      }
-
-      try {
-        const tokens = JSON.parse(data);
-        const messageContent = tokens.message?.content || "";
-        fullPrompt += messageContent;
-
-        setArrayChat((prev) => {
-          const newArray = [...prev];
-          const assistantMessage = {
-            name: prompts_name,
-            message: fullPrompt,
-            isImg: false,
-            date: currentDate(),
-          };
-          return [...newArray, assistantMessage];
-        });
-
-        scrollChatBottom();
-
-        if (tokens.is_finish) {
-          enableChat();
-          source.close();
-          hasResponded = true;
-        }
-      } catch (err) {
-        console.error("JSON parsing error:", err);
+      // Kiểm tra nếu chatbot đã trả lời xong
+      if (tokens.is_finish) {
+        console.log("Chatbot response finished.");
         enableChat();
       }
-    });
+    } catch (err) {
+      console.error("JSON parsing error:", err);
+      enableChat();
+    }
   };
 
   const updateChat = async (str) => {
@@ -298,7 +276,7 @@ const ChatComponent = () => {
           onPress={sendUserChat}
           disabled={isWaitingForResponse}
         >
-          <Text style={styles.sendButton}>Gửi</Text>
+          <MaterialIcons name="send" style={styles.sendButton} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -397,6 +375,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     color: "#0a7cff",
     fontWeight: "bold",
+    fontSize: 30,
   },
   body: {
     flexDirection: "row",
