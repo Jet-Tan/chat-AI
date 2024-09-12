@@ -14,6 +14,7 @@ import {
 import axios from "axios";
 import EventSource from "react-native-sse";
 import { MaterialIcons } from "@expo/vector-icons";
+
 const CHAT_PHP_url =
   "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat";
 const prompts_name = "Riokupon AI";
@@ -31,7 +32,7 @@ const ChatComponent = () => {
 
   const disableChat = () => setIsWaitingForResponse(true);
   const enableChat = () => setIsWaitingForResponse(false);
-  console.log("check", arrayChat);
+
   const scrollChatBottom = useCallback(() => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, []);
@@ -47,36 +48,10 @@ const ChatComponent = () => {
         isImg: false,
         date: currentDate(),
       };
-      setArrayChat((prev) => [...prev, newChat]); // Thêm tin nhắn người dùng vào arrayChat
+      setArrayChat((prev) => [...prev, newChat]);
       scrollChatBottom();
-      getResponse(chat); // Gọi API để nhận phản hồi từ chatbot
+      getResponse(chat);
     }
-  };
-
-  const createCustomEventSource = (url, options) => {
-    const defaultOptions = {
-      lineEndingCharacter: "\n",
-      ...options,
-    };
-
-    const eventSource = new EventSource(url, defaultOptions);
-    let buffer = "";
-
-    eventSource.onopen = () => console.log("EventSource connection opened");
-    eventSource.onerror = (error) => console.log("EventSource error:", error);
-
-    eventSource.addEventListener("message", (event) => {
-      console.log("Received event data:", event.data);
-      buffer += event.data;
-      let messages = buffer.split(/\r?\n\r?\n/); // Tách tin nhắn dựa trên kết thúc dòng
-      buffer = messages.pop() || "";
-      messages.forEach((message) => {
-        if (message.trim()) {
-          console.log("Processed message:", message);
-        }
-      });
-    });
-    return eventSource;
   };
 
   const getResponse = async (prompt) => {
@@ -103,9 +78,9 @@ const ChatComponent = () => {
         },
       });
 
-      // Nếu API trả về thành công, xử lý phản hồi
-      streamChatCoze(response.data); // Sử dụng dữ liệu phản hồi
       console.log("Response from API:", response.data);
+
+      streamChatCoze(response.data);
     } catch (e) {
       console.error(`Error creating SSE: ${e}`);
       enableChat();
@@ -116,45 +91,29 @@ const ChatComponent = () => {
     let fullPrompt = "";
 
     try {
-      const tokens = JSON.stringify(data);
+      const tokens = JSON.parse(JSON.stringify(data));
       const messageContent = tokens.message?.content || "";
       fullPrompt += messageContent;
 
-      // Cập nhật arrayChat ngay khi chatbot trả về một phần phản hồi
+      // Cập nhật trực tiếp phản hồi của chatbot vào arrayChat
       setArrayChat((prev) => {
-        const newArray = [...prev];
         const assistantMessage = {
           name: prompts_name,
           message: fullPrompt,
           isImg: false,
           date: currentDate(),
         };
-        return [...newArray, assistantMessage];
+        return [...prev, assistantMessage];
       });
 
       scrollChatBottom();
 
-      // Kiểm tra nếu chatbot đã trả lời xong
       if (tokens.is_finish) {
-        console.log("Chatbot response finished.");
         enableChat();
       }
     } catch (err) {
       console.error("JSON parsing error:", err);
       enableChat();
-    }
-  };
-
-  const updateChat = async (str) => {
-    try {
-      await axios.post(CHAT_PHP_url, {
-        user_id: "279573",
-        thread_id: "thread_lYgV8ip1IDPJk0jYsggtEJsD",
-        message: str,
-        is_mod: 2,
-      });
-    } catch (error) {
-      console.error("Error updating chat:", error);
     }
   };
 
@@ -240,6 +199,7 @@ const ChatComponent = () => {
       </View>
     );
   };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -314,99 +274,74 @@ const styles = StyleSheet.create({
   agent_content: {
     alignItems: "flex-start",
     marginVertical: 10,
-    marginRight: 15,
-  },
-  agent_message: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    alignSelf: "flex-start",
-    fontSize: 16,
-  },
-  chat_logo: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#ffffff",
-    padding: 2,
-    shadowColor: "#0f0f0f",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.175,
-    shadowRadius: 3,
-    elevation: 3,
-    marginRight: 5,
+    paddingHorizontal: 16,
   },
   user_content: {
-    alignSelf: "flex-end",
-    marginBottom: 10,
-  },
-  user_message: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    backgroundColor: "#0a7cff",
-    borderRadius: 8,
-    marginVertical: 5,
-    color: "#fff",
-    fontSize: 16,
-    textAlign: "center",
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: 10,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 10,
-    borderTopWidth: 1,
-    borderColor: "#ccc",
-    backgroundColor: "#fff",
-  },
-  input: {
-    flex: 1,
-    height: 40,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 15,
-  },
-  sendButton: {
-    marginLeft: 10,
-    color: "#0a7cff",
-    fontWeight: "bold",
-    fontSize: 30,
+    alignItems: "flex-end",
+    marginVertical: 10,
+    paddingHorizontal: 16,
   },
   body: {
     flexDirection: "row",
+    maxWidth: "80%",
+    alignItems: "center",
+  },
+  agent_message: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 12,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  user_message: {
+    backgroundColor: "#0a7cff",
+    borderRadius: 16,
+    padding: 12,
+    fontSize: 15,
+    lineHeight: 20,
+    color: "#fff",
   },
   timeHtm: {
-    fontSize: 12,
-    marginTop: 5,
+    fontSize: 10,
+    paddingLeft: 8,
+    color: "#ccc",
   },
   timeHtmUser: {
-    fontSize: 12,
-    alignSelf: "flex-end",
+    fontSize: 10,
+    paddingLeft: 8,
+    color: "#999",
   },
-  messageContainer: {
-    marginBottom: 10,
+  chat_logo: {
+    width: 25,
+    height: 25,
+    marginRight: 8,
   },
-  timestamp: {
-    fontSize: 12,
-    color: "#888",
+  scrollView: {
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingBottom: 50,
   },
-  typingIndicator: {
+  inputContainer: {
     flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#e9e9e9",
     alignItems: "center",
-    justifyContent: "center",
-    padding: 10,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    marginHorizontal: 4,
-    borderRadius: 4,
-    backgroundColor: "#0a7cff",
+  input: {
+    flex: 1,
+    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 25,
+    marginRight: 10,
+  },
+  sendButton: {
+    fontSize: 28,
+    color: "#0a7cff",
   },
 });
 
