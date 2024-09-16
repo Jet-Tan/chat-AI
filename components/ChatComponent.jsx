@@ -15,7 +15,8 @@ import axios from "axios";
 import EventSource from "react-native-sse";
 import { MaterialIcons } from "@expo/vector-icons";
 
-const CHAT_PHP_URL = "https://dev.canbds.com/api/assistant.php?action=chat";
+const CHAT_PHP_URL =
+  "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat";
 const USER_ID = "279573";
 const THREAD_ID = "thread_lYgV8ip1IDPJk0jYsggtEJsD";
 const PROMPTS_NAME = "Riokupon AI";
@@ -60,6 +61,7 @@ const ChatComponent = () => {
     const eventSource = new EventSource(url);
 
     eventSource.onopen = () => console.log("EventSource connection opened");
+
     eventSource.onerror = (error) => {
       console.error("EventSource error:", error);
       eventSource.close();
@@ -70,14 +72,16 @@ const ChatComponent = () => {
       console.log("Raw message received:", event.data);
       buffer += event.data;
 
-      // Check different delimiters
+      // Use the specified line-ending character, which should be \n\n for SSE
       const lineEnding = defaultOptions.lineEndingCharacter;
-      const messages = buffer.split(lineEnding);
-      buffer = messages.pop() || "";
+      const messages = buffer.split(lineEnding); // Split by the line ending character
+      buffer = messages.pop() || ""; // Retain the last incomplete chunk, if any
 
       messages.forEach((message) => {
-        console.log("Processing message:", message);
-        if (message.trim()) streamChatCoze(message);
+        if (message.trim()) {
+          console.log("Processing message:", message);
+          streamChatCoze(message);
+        }
       });
     };
 
@@ -344,6 +348,7 @@ const styles = StyleSheet.create({
   timeHtm: {
     fontSize: 10,
     marginTop: 5,
+    paddingLeft: 8,
     color: "#333333",
     textAlign: "left",
     fontWeight: "700",
@@ -351,6 +356,7 @@ const styles = StyleSheet.create({
   timeHtmUser: {
     fontSize: 10,
     marginTop: 5,
+    paddingRight: 8,
     color: "#333333",
     textAlign: "right",
     fontWeight: "700",
