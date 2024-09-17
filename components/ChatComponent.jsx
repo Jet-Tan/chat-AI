@@ -1,19 +1,18 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Platform,
-  StyleSheet,
   View,
   Text,
-  Image,
-  Vibration,
   TextInput,
   TouchableOpacity,
+  Image,
   ScrollView,
   KeyboardAvoidingView,
+  Platform,
+  Vibration,
+  StyleSheet,
 } from "react-native";
 import axios from "axios";
-import EventSource from "react-native-sse";
-import { MaterialIcons } from "@expo/vector-icons";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
 const CHAT_PHP_URL =
   "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat";
@@ -30,10 +29,10 @@ const ChatComponent = () => {
 
   const currentDate = () => new Date().toLocaleString();
   const generateUniqueID = (prefix = "id_") => `${prefix}${Date.now()}`;
-  const scrollChatBottom = useCallback(
-    () => scrollViewRef.current?.scrollToEnd({ animated: true }),
-    []
-  );
+
+  const scrollChatBottom = useCallback(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, []);
 
   const disableChat = () => setIsWaitingForResponse(true);
   const enableChat = () => setIsWaitingForResponse(false);
@@ -43,6 +42,7 @@ const ChatComponent = () => {
       const chat = message.trim();
       setMessage("");
       disableChat();
+
       const newChat = {
         name: "User",
         message: chat,
@@ -51,113 +51,69 @@ const ChatComponent = () => {
       };
       setArrayChat((prev) => [...prev, newChat]);
       scrollChatBottom();
-      postChatMessage(chat);
+      getResponse(chat);
     }
   };
 
-  const createCustomEventSource = (url, options = {}) => {
-    const defaultOptions = { lineEndingCharacter: "\n\n", ...options };
-    let buffer = "";
-    const eventSource = new EventSource(url);
-
-    eventSource.onopen = () => console.log("EventSource connection opened");
-
-    eventSource.onerror = (error) => {
-      console.error("EventSource error:", error);
-      eventSource.close();
-      enableChat();
-    };
-
-    eventSource.onmessage = (event) => {
-      console.log("Raw message received:", event.data);
-      buffer += event.data;
-
-      // Use the specified line-ending character, which should be \n\n for SSE
-      const lineEnding = defaultOptions.lineEndingCharacter;
-      const messages = buffer.split(lineEnding); // Split by the line ending character
-      buffer = messages.pop() || ""; // Retain the last incomplete chunk, if any
-
-      messages.forEach((message) => {
-        if (message.trim()) {
-          console.log("Processing message:", message);
-          streamChatCoze(message);
-        }
-      });
-    };
-
-    return eventSource;
-  };
-
-  const postChatMessage = async (prompt) => {
+  const getResponse = async (prompt) => {
     if (isWaitingForResponse) return;
 
     disableChat();
+
     const arrayMessages = arrayChat.map((chat) => ({
       role: chat.name === "User" ? "user" : "assistant",
       content: chat.message,
     }));
 
-    const params = new URLSearchParams({
-      array_chat: JSON.stringify(arrayMessages),
-      user_id: USER_ID,
-      thread_id: THREAD_ID,
-      message: prompt,
-      is_mod: "0",
-    });
+    const params = new URLSearchParams();
+    params.append("array_chat", JSON.stringify(arrayMessages));
+    params.append("user_id", USER_ID);
+    params.append("thread_id", THREAD_ID);
+    params.append("message", prompt);
+    params.append("is_mod", "0");
 
-    const url = `${CHAT_PHP_URL}?${params.toString()}`;
-    console.log("Posting message to:", url);
+    try {
+      const response = await axios.post(CHAT_PHP_URL, params.toString(), {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
 
-    // Use the custom EventSource handler
-    const eventSource = createCustomEventSource(url);
+      console.log("Response from API:", response.data);
 
-    eventSource.onopen = () => console.log("EventSource connection opened");
-    eventSource.onerror = (error) => {
-      console.error("EventSource error:", error);
-      eventSource.close();
+      streamChatCoze(response.data);
+    } catch (e) {
+      console.error(`Error creating SSE: ${e}`);
       enableChat();
-    };
-
-    eventSource.onmessage = (event) => {
-      console.log("Message received from chatbot:", event.data);
-      streamChatCoze(event.data);
-    };
+    }
   };
 
   const streamChatCoze = (data) => {
     try {
-      console.log("Streaming chatbot response:", data);
-
       const jsonString = data.replace(/^data:\s*/, "");
-      console.log("Cleaned JSON string:", jsonString);
-      const tokens = JSON.parse(jsonString);
-      const messageContent = tokens.message?.content || "";
+      const parsedData = JSON.parse(jsonString);
 
-      console.log("Parsed tokens:", tokens);
-      setArrayChat((prev) => {
-        const newArray = [...prev];
-        const lastAssistantMessage = newArray[newArray.length - 1];
+      console.log("Parsed Data:", parsedData);
 
-        if (
-          lastAssistantMessage &&
-          lastAssistantMessage.name === PROMPTS_NAME
-        ) {
-          lastAssistantMessage.message += messageContent;
-        } else {
-          newArray.push({
+      const messageContent = parsedData.message?.content || "";
+      console.log("Message Content:", messageContent);
+
+      if (messageContent) {
+        setArrayChat((prev) => [
+          ...prev,
+          {
             name: PROMPTS_NAME,
             message: messageContent,
             isImg: false,
             date: currentDate(),
-          });
-        }
+            is_reply: "1",
+          },
+        ]);
 
-        return newArray;
-      });
+        scrollChatBottom();
+      }
 
-      scrollChatBottom();
-
-      if (tokens.is_finish) {
+      if (parsedData.is_finish) {
         enableChat();
       }
     } catch (err) {
@@ -166,40 +122,57 @@ const ChatComponent = () => {
     }
   };
 
-  const fetchChatData = async () => {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const apiUrl = `https://api.riokupon.com/vn/openai/assistant.php?action=get_messages&user_id=${USER_ID}&time=${timestamp}`;
-
-    try {
-      const response = await axios.get(apiUrl);
-      const data = response.data;
-      const messagesArray = Array.isArray(data) ? data : data.data || [];
-      messagesArray.sort((a, b) =>
-        a.time_created === b.time_created
-          ? a.id - b.id
-          : a.time_created - b.time_created
-      );
-      const limitMessages = messagesArray.slice(0, 50);
-
-      setMessages((prevMessages) => {
-        const existingMessageIds = new Set(prevMessages.map((msg) => msg.id));
-        const newMessages = limitMessages.filter(
-          (msg) => !existingMessageIds.has(msg.id)
-        );
-        if (newMessages.length > 0) Vibration.vibrate(200);
-        return [...prevMessages, ...newMessages];
-      });
-    } catch (error) {
-      console.error("Error fetching chat data:", error);
-    }
-  };
-
   useEffect(() => {
+    const fetchChatData = async () => {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const apiUrl = `https://api.riokupon.com/vn/openai/assistant.php?action=get_messages&user_id=${USER_ID}&time=${timestamp}`;
+
+      try {
+        const response = await axios.get(apiUrl);
+        const data = response.data;
+        const messagesArray = Array.isArray(data) ? data : data.data || [];
+
+        messagesArray.sort((a, b) =>
+          a.time_created === b.time_created
+            ? a.id - b.id
+            : b.time_created - a.time_created
+        );
+
+        const limitMessages = messagesArray.slice(0, 30);
+
+        setMessages((prevMessages) => {
+          const existingMessageIds = new Set(prevMessages.map((msg) => msg.id));
+
+          const newMessages = limitMessages.filter(
+            (msg) => !existingMessageIds.has(msg.id)
+          );
+
+          if (newMessages.length > 0) {
+            Vibration.vibrate(200);
+          }
+
+          return [...prevMessages, ...newMessages].sort((a, b) =>
+            a.time_created === b.time_created
+              ? a.id - b.id
+              : a.time_created - b.time_created
+          );
+        });
+      } catch (error) {
+        console.error("Error fetching chat data:", error);
+      }
+    };
+
     fetchChatData();
   }, []);
 
   useEffect(() => {
     scrollChatBottom();
+  }, [arrayChat, messages]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollChatBottom();
+    }, 500);
+    return () => clearTimeout(timer);
   }, [arrayChat, messages]);
 
   const renderMessageItem = (message, isUserMessage = false) => {
@@ -209,16 +182,20 @@ const ChatComponent = () => {
     const isToday = messageDate.toDateString() === now.toDateString();
     const isThisYear = messageDate.getFullYear() === now.getFullYear();
     const timeHtm = messageDate.toLocaleTimeString();
-    const dateHtm = !isToday
-      ? isThisYear
+
+    let dateHtm = "";
+    if (!isToday) {
+      dateHtm = isThisYear
         ? messageDate.toLocaleDateString(undefined, {
             month: "2-digit",
             day: "2-digit",
           })
-        : messageDate.toLocaleDateString()
-      : "";
+        : messageDate.toLocaleDateString();
+    }
 
-    const key = message.id ? message.id.toString() : generateUniqueID();
+    const key = message.id
+      ? message.id.toString()
+      : generateUniqueID(`msg_${message.time_created}_${Math.random()}`);
     return (
       <View
         key={key}
@@ -236,8 +213,7 @@ const ChatComponent = () => {
               {message.message}
             </Text>
             <Text style={isAgent ? styles.timeHtm : styles.timeHtmUser}>
-              {dateHtm && `${dateHtm} `}
-              {timeHtm}
+              {dateHtm && `${dateHtm} `} {timeHtm}
             </Text>
           </View>
         </View>
@@ -249,7 +225,7 @@ const ChatComponent = () => {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.select({ ios: 50, android: 30 })}
+      keyboardVerticalOffset={Platform.select({ ios: 50, android: 50 })}
     >
       <ScrollView ref={scrollViewRef} style={styles.scrollView}>
         <View style={styles.live_chat}>
@@ -265,8 +241,8 @@ const ChatComponent = () => {
             Riokupon AI đang trực tuyến
           </Text>
         </View>
-        {messages.map((message) => renderMessageItem(message))}
-        {arrayChat.map((chat, index) => renderMessageItem(chat, true))}
+        {messages.map((msg) => renderMessageItem(msg))}
+        {arrayChat.map((chat) => renderMessageItem(chat, true))}
       </ScrollView>
       <View style={styles.inputContainer}>
         <TextInput
@@ -344,6 +320,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
     color: "#fff",
+    textAlign: "center",
   },
   timeHtm: {
     fontSize: 10,
