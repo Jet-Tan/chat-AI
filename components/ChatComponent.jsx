@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import axios from "axios";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-
+import EventSource from "react-native-sse";
 const CHAT_PHP_URL =
   "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat";
 const USER_ID = "279573";
@@ -65,31 +65,86 @@ const ChatComponent = () => {
       content: chat.message,
     }));
 
-    const params = new URLSearchParams();
-    params.append("array_chat", JSON.stringify(arrayMessages));
-    params.append("user_id", USER_ID);
-    params.append("thread_id", THREAD_ID);
-    params.append("message", prompt);
-    params.append("is_mod", "0");
+    const params = new URLSearchParams({
+      message: prompt,
+      user_id: USER_ID,
+      thread_id: THREAD_ID,
+      array_chat: JSON.stringify(arrayMessages),
+      is_mod: "0",
+    }).toString();
 
     try {
-      const response = await axios.post(CHAT_PHP_URL, params.toString(), {
+      const response = await axios.post(CHAT_PHP_URL, params, {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
       });
+      console.log("POST response:", response.data);
+      // Initialize EventSource after preparing the params
+      const eventSource = new EventSource(CHAT_PHP_URL, {
+        stream: true,
+        lineEndingCharacter: "\n",
+      });
 
-      console.log("Response from API:", response.data);
+      console.log("EventSource initialized:", eventSource);
 
-      streamChatCoze(response.data);
-    } catch (e) {
-      console.error(`Error creating SSE: ${e}`);
-      enableChat();
+      eventSource.addEventListener("open", () => {
+        console.log("SSE connection opened.");
+      });
+      eventSource.onmessage = (event) => {
+        console.log("Raw event data received:", event.data);
+      };
+
+      let bufferedData = "";
+
+      eventSource.addEventListener("message", (event) => {
+        console.log("Event Data Received:", event.data);
+        if (event.data) {
+          bufferedData += event.data;
+
+          // Check if buffered data contains a complete JSON object
+          if (bufferedData.startsWith("{") && bufferedData.endsWith("}")) {
+            try {
+              const data = JSON.parse(bufferedData);
+              bufferedData = ""; // Clear the buffer after parsing
+
+              console.log("Real-time message received:", data);
+
+              // Process the received message
+              streamChatCoze(data);
+
+              if (data.is_finish) {
+                enableChat();
+                eventSource.close(); // Close the connection when finished
+              }
+            } catch (err) {
+              console.error("Error parsing buffered data:", err);
+            }
+          }
+        } else {
+          console.warn("Received empty or undefined data");
+        }
+      });
+
+      eventSource.addEventListener("error", (event) => {
+        console.error("SSE Error:", event);
+        enableChat(); // Re-enable chat on error
+        eventSource.close(); // Close connection on error
+      });
+    } catch (error) {
+      console.error(`Error sending message: ${error}`);
+      enableChat(); // Re-enable chat on error
     }
   };
 
   const streamChatCoze = (data) => {
     try {
+      if (!data) {
+        console.warn("Received empty or undefined data in streamChatCoze");
+        return;
+      }
+
+      // Remove unnecessary prefixes before parsing JSON
       const jsonString = data.replace(/^data:\s*/, "");
       const parsedData = JSON.parse(jsonString);
 
@@ -209,9 +264,12 @@ const ChatComponent = () => {
             />
           )}
           <View>
-            <Text style={isAgent ? styles.agent_message : styles.user_message}>
-              {message.message}
-            </Text>
+            <View style={isAgent ? styles.agent_message : styles.user_message}>
+              <Text style={{ color: isAgent ? "#333" : "#fff" }}>
+                {message.message}
+              </Text>
+            </View>
+
             <Text style={isAgent ? styles.timeHtm : styles.timeHtmUser}>
               {dateHtm && `${dateHtm} `} {timeHtm}
             </Text>
