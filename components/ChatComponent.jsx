@@ -14,6 +14,7 @@ import {
 import axios from "axios";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import EventSource from "react-native-sse";
+import Markdown from "react-native-markdown-display";
 const CHAT_PHP_URL =
   "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat";
 const USER_ID = "279573";
@@ -54,7 +55,6 @@ const ChatComponent = () => {
       getResponse(chat);
     }
   };
-
   const getResponse = async (prompt) => {
     if (isWaitingForResponse) return;
 
@@ -74,68 +74,19 @@ const ChatComponent = () => {
     }).toString();
 
     try {
+      // Send the message to the server
       const response = await axios.post(CHAT_PHP_URL, params, {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
       });
-      console.log("POST response:", response.data);
-      // Initialize EventSource after preparing the params
-      const eventSource = new EventSource(CHAT_PHP_URL, {
-        stream: true,
-        lineEndingCharacter: "\n",
-      });
-
-      console.log("EventSource initialized:", eventSource);
-
-      eventSource.addEventListener("open", () => {
-        console.log("SSE connection opened.");
-      });
-      eventSource.onmessage = (event) => {
-        console.log("Raw event data received:", event.data);
-      };
-
-      let bufferedData = "";
-
-      eventSource.addEventListener("message", (event) => {
-        console.log("Event Data Received:", event.data);
-        if (event.data) {
-          bufferedData += event.data;
-
-          // Check if buffered data contains a complete JSON object
-          if (bufferedData.startsWith("{") && bufferedData.endsWith("}")) {
-            try {
-              const data = JSON.parse(bufferedData);
-              bufferedData = ""; // Clear the buffer after parsing
-
-              console.log("Real-time message received:", data);
-
-              // Process the received message
-              streamChatCoze(data);
-
-              if (data.is_finish) {
-                enableChat();
-                eventSource.close(); // Close the connection when finished
-              }
-            } catch (err) {
-              console.error("Error parsing buffered data:", err);
-            }
-          }
-        } else {
-          console.warn("Received empty or undefined data");
-        }
-      });
-
-      eventSource.addEventListener("error", (event) => {
-        console.error("SSE Error:", event);
-        enableChat(); // Re-enable chat on error
-        eventSource.close(); // Close connection on error
-      });
+      streamChatCoze(response.data);
     } catch (error) {
       console.error(`Error sending message: ${error}`);
-      enableChat(); // Re-enable chat on error
+      enableChat();
     }
   };
+  let buffer = "";
 
   const streamChatCoze = (data) => {
     try {
@@ -144,36 +95,51 @@ const ChatComponent = () => {
         return;
       }
 
-      // Remove unnecessary prefixes before parsing JSON
-      const jsonString = data.replace(/^data:\s*/, "");
-      const parsedData = JSON.parse(jsonString);
+      // Print raw data
+      console.log("Raw data received:", data);
 
-      console.log("Parsed Data:", parsedData);
+      // Accumulate data in the buffer
+      buffer += data.replace(/^data:\s*/, "");
 
-      const messageContent = parsedData.message?.content || "";
-      console.log("Message Content:", messageContent);
+      // Try parsing the accumulated buffer
+      try {
+        const parsedData = JSON.parse(buffer);
 
-      if (messageContent) {
-        setArrayChat((prev) => [
-          ...prev,
-          {
-            name: PROMPTS_NAME,
-            message: messageContent,
-            isImg: false,
-            date: currentDate(),
-            is_reply: "1",
-          },
-        ]);
+        console.log("Parsed Data:", parsedData);
 
-        scrollChatBottom();
-      }
+        // Handle the message content
+        const messageContent = parsedData.message?.content || "";
+        console.log("Message Content:", messageContent);
 
-      if (parsedData.is_finish) {
-        enableChat();
+        if (messageContent) {
+          setArrayChat((prev) => [
+            ...prev,
+            {
+              name: PROMPTS_NAME,
+              message: messageContent,
+              isImg: false,
+              date: currentDate(),
+              is_reply: "1",
+            },
+          ]);
+
+          scrollChatBottom();
+        }
+
+        // Check if the message is finished
+        if (parsedData.is_finish === true) {
+          console.log("Message finished, no more data expected.");
+          isPollingActive = false; // Stop further polling
+          buffer = ""; // Clear buffer
+          enableChat(); // Re-enable chat when finished
+          return; // Stop processing further data
+        }
+      } catch (e) {
+        console.warn("Buffer does not yet contain complete JSON data.");
       }
     } catch (err) {
-      console.error("Error parsing chatbot response:", err);
-      enableChat();
+      console.error("Error processing chatbot response:", err);
+      enableChat(); // Ensure chat is enabled on error
     }
   };
 
@@ -230,6 +196,23 @@ const ChatComponent = () => {
     return () => clearTimeout(timer);
   }, [arrayChat, messages]);
 
+  // const renderers = {
+  //   image: ({ src }) => (
+  //     <Image
+  //       source={{ uri: src }}
+  //       style={{ width: 200, height: 200 }}
+  //       resizeMode="contain"
+  //     />
+  //   ),
+  //   link: ({ children, href }) => (
+  //     <TouchableOpacity onPress={() => Linking.openURL(href)}>
+  //       <Text style={{ color: "blue", textDecorationLine: "underline" }}>
+  //         {children}
+  //       </Text>
+  //     </TouchableOpacity>
+  //   ),
+  // };
+
   const renderMessageItem = (message, isUserMessage = false) => {
     const isAgent = message.is_reply === "1";
     const messageDate = new Date(message.time_created * 1000 || new Date());
@@ -251,6 +234,7 @@ const ChatComponent = () => {
     const key = message.id
       ? message.id.toString()
       : generateUniqueID(`msg_${message.time_created}_${Math.random()}`);
+
     return (
       <View
         key={key}
@@ -265,9 +249,14 @@ const ChatComponent = () => {
           )}
           <View>
             <View style={isAgent ? styles.agent_message : styles.user_message}>
-              <Text style={{ color: isAgent ? "#333" : "#fff" }}>
+              <Markdown
+                style={{
+                  body: { color: isAgent ? "#333" : "#fff", fontSize: 16 },
+                }}
+                // renderers={renderers}
+              >
                 {message.message}
-              </Text>
+              </Markdown>
             </View>
 
             <Text style={isAgent ? styles.timeHtm : styles.timeHtmUser}>
@@ -353,12 +342,10 @@ const styles = StyleSheet.create({
   agent_content: {
     alignItems: "flex-start",
     marginVertical: 10,
-    paddingHorizontal: 16,
   },
   user_content: {
     alignItems: "flex-end",
     marginVertical: 10,
-    paddingHorizontal: 16,
   },
   body: {
     flexDirection: "row",
@@ -367,24 +354,22 @@ const styles = StyleSheet.create({
   agent_message: {
     backgroundColor: "#fff",
     borderRadius: 16,
-    padding: 12,
-    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     lineHeight: 20,
   },
   user_message: {
     backgroundColor: "#0a7cff",
     borderRadius: 16,
-    padding: 12,
-    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     lineHeight: 20,
-    color: "#fff",
-    textAlign: "center",
   },
   timeHtm: {
     fontSize: 10,
     marginTop: 5,
     paddingLeft: 8,
-    color: "#333333",
+    color: "#333",
     textAlign: "left",
     fontWeight: "700",
   },
@@ -392,7 +377,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 5,
     paddingRight: 8,
-    color: "#333333",
+    color: "#333",
     textAlign: "right",
     fontWeight: "700",
   },

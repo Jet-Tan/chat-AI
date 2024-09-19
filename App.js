@@ -3,14 +3,17 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, StatusBar } from "react-native";
 import ChatScreen from "./screens/ChatScreen";
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <AppContent />
-    </SafeAreaProvider>
+    <>
+      <StatusBar barStyle="dark-content" />
+      <SafeAreaProvider>
+        <AppContent />
+      </SafeAreaProvider>
+    </>
   );
 }
 
