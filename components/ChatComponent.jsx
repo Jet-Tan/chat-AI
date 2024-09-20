@@ -64,7 +64,7 @@ const ChatComponent = () => {
       role: chat.name === "User" ? "user" : "assistant",
       content: chat.message,
     }));
-
+    console.log("check", arrayMessages);
     const params = new URLSearchParams({
       message: prompt,
       user_id: USER_ID,
@@ -74,13 +74,26 @@ const ChatComponent = () => {
     }).toString();
 
     try {
-      // Send the message to the server
       const response = await axios.post(CHAT_PHP_URL, params, {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
       });
       streamChatCoze(response.data);
+      // const source = new EventSource(CHAT_PHP_URL, {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/x-www-form-urlencoded",
+      //   },
+      //   body: params,
+      //   lineEndingCharacter: "\n",
+      // });
+      // streamChatCoze(source);
+      // source.stream();
+      // source.onmessage = function (event) {
+      //   alert(event.data);
+      // };
+      scrollChatBottom();
     } catch (error) {
       console.error(`Error sending message: ${error}`);
       enableChat();
@@ -126,13 +139,11 @@ const ChatComponent = () => {
           scrollChatBottom();
         }
 
-        // Check if the message is finished
         if (parsedData.is_finish === true) {
           console.log("Message finished, no more data expected.");
-          isPollingActive = false; // Stop further polling
-          buffer = ""; // Clear buffer
-          enableChat(); // Re-enable chat when finished
-          return; // Stop processing further data
+          buffer = "";
+          enableChat();
+          return;
         }
       } catch (e) {
         console.warn("Buffer does not yet contain complete JSON data.");

@@ -8,12 +8,9 @@ import ChatScreen from "./screens/ChatScreen";
 
 export default function App() {
   return (
-    <>
-      <StatusBar barStyle="dark-content" />
-      <SafeAreaProvider>
-        <AppContent />
-      </SafeAreaProvider>
-    </>
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
   );
 }
 
