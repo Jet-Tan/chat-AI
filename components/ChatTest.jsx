@@ -46,14 +46,12 @@ const ChatTest = () => {
   };
 
   const getResponse = async (prompt) => {
-    console.log("check 123", prompt);
     chatMessages.push({
       name: "User",
       message: prompt,
       isImg: false,
       date: currentDate(),
     });
-    console.log("data 123", chatMessages);
     const array_messages = chatMessages.map((msg) => ({
       role: msg.training
         ? "system"
@@ -64,27 +62,24 @@ const ChatTest = () => {
     }));
 
     console.log("ch12", array_messages);
-    console.log("ch12", array_messages);
-    const params = {
-      array_chat: JSON.stringify(array_messages),
-      user_id: "279573",
-      thread_id: "thread_lYgV8ip1IDPJk0jYsggtEJsD",
-      message: prompt,
-      is_mod: "0",
-    };
 
+    const params = new FormData();
+    params.append("array_chat", JSON.stringify(array_messages));
+    params.append("user_id", "279573");
+    params.append("thread_id", "thread_lYgV8ip1IDPJk0jYsggtEJsD");
+    params.append("message", prompt);
+    params.append("is_mod", "0");
     // Chuyển đổi object thành query string
-    const queryString = new URLSearchParams(params).toString();
-
+    const queryString = new URLSearchParams(params);
+    console.log("sdas", queryString);
     try {
-      const response = await fetch(CHAT_PHP_URL, {
+      const response = await fetch(CHAT_PHP_URL, queryString, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: queryString,
       });
-
+      console.log("123", response);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -93,7 +88,7 @@ const ChatTest = () => {
       const source = new SSE(CHAT_PHP_URL, {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
-
+      console.log("chgeck", source);
       streamChatCoze(source);
       source.stream();
     } catch (error) {
@@ -101,7 +96,6 @@ const ChatTest = () => {
     }
   };
   const streamChatCoze = (source) => {
-    console.log("tan", source);
     let fullPrompt = "";
     let partPrompt = "";
 

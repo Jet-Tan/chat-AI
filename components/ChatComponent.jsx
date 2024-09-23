@@ -15,6 +15,7 @@ import axios from "axios";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import EventSource from "react-native-sse";
 import Markdown from "react-native-markdown-display";
+import LoadingDots from "./LoadingDots";
 const CHAT_PHP_URL =
   "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat";
 const USER_ID = "279573";
@@ -26,6 +27,8 @@ const ChatComponent = () => {
   const [arrayChat, setArrayChat] = useState([]);
   const [message, setMessage] = useState("");
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
+  const [showTypingIndicator, setShowTypingIndicator] = useState(false);
+
   const scrollViewRef = useRef(null);
 
   const currentDate = () => new Date().toLocaleString();
@@ -39,118 +42,211 @@ const ChatComponent = () => {
   const enableChat = () => setIsWaitingForResponse(false);
 
   const sendUserChat = () => {
-    if (message.trim()) {
-      const chat = message.trim();
-      setMessage("");
-      disableChat();
+    if (isWaitingForResponse || !message.trim()) return;
 
-      const newChat = {
-        name: "User",
-        message: chat,
-        isImg: false,
-        date: currentDate(),
-      };
-      setArrayChat((prev) => [...prev, newChat]);
-      scrollChatBottom();
-      getResponse(chat);
-    }
+    const chat = message.trim();
+    setMessage("");
+    disableChat();
+    scrollChatBottom();
+    getResponse(chat);
   };
+
   const getResponse = async (prompt) => {
     if (isWaitingForResponse) return;
 
+    setShowTypingIndicator(true);
+    setIsWaitingForResponse(true);
     disableChat();
-
-    const arrayMessages = arrayChat.map((chat) => ({
-      role: chat.name === "User" ? "user" : "assistant",
-      content: chat.message,
-    }));
-    console.log("check", arrayMessages);
-    const params = new URLSearchParams({
+    const randomID = generateUniqueID();
+    console.log("chec", randomID);
+    arrayChat.push({
+      name: "User",
       message: prompt,
-      user_id: USER_ID,
-      thread_id: THREAD_ID,
-      array_chat: JSON.stringify(arrayMessages),
-      is_mod: "0",
-    }).toString();
+      isImg: false,
+      date: currentDate(),
+    });
 
+    const arrayMessages = arrayChat.map((msg) => ({
+      role: msg.training
+        ? "system"
+        : msg.name === "User"
+        ? "user"
+        : "assistant",
+      content: msg.message,
+    }));
+    console.log("checl", arrayMessages);
+    const params = new URLSearchParams();
+    params.append("array_chat", JSON.stringify(arrayMessages));
+    params.append("user_id", "279573");
+    params.append("thread_id", "thread_lYgV8ip1IDPJk0jYsggtEJsD");
+    params.append("message", prompt);
+    params.append("is_mod", "0");
+
+    console.log("dataaa", params);
     try {
-      const response = await axios.post(CHAT_PHP_URL, params, {
+      const response = await axios.post(CHAT_PHP_URL, params.toString(), {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
       });
-      streamChatCoze(response.data);
-      // const source = new EventSource(CHAT_PHP_URL, {
-      //   method: "POST",
-      //   headers: {
-      //     "Content-Type": "application/x-www-form-urlencoded",
-      //   },
-      //   body: params,
-      //   lineEndingCharacter: "\n",
-      // });
-      // streamChatCoze(source);
-      // source.stream();
-      // source.onmessage = function (event) {
-      //   alert(event.data);
-      // };
+
+      streamChatCoze(response.data, randomID);
       scrollChatBottom();
     } catch (error) {
       console.error(`Error sending message: ${error}`);
       enableChat();
+    } finally {
+      // Tắt hiển thị dấu 3 chấm khi phản hồi hoàn tất
+      setShowTypingIndicator(false);
+      setIsWaitingForResponse(false);
     }
   };
+
   let buffer = "";
 
-  const streamChatCoze = (data) => {
+  const streamChatCoze = (data, randomID) => {
     try {
       if (!data) {
         console.warn("Received empty or undefined data in streamChatCoze");
         return;
       }
 
-      // Print raw data
-      console.log("Raw data received:", data);
+      const lines = data
+        .split("\n")
+        .map((line) => line.replace(/^data:\s*/, ""));
 
-      // Accumulate data in the buffer
-      buffer += data.replace(/^data:\s*/, "");
+      buffer += lines.join("");
+      console.log("Current buffer:", buffer);
 
-      // Try parsing the accumulated buffer
       try {
-        const parsedData = JSON.parse(buffer);
+        const jsonObjects = buffer.match(/{.*?}(?={|$)/g);
 
-        console.log("Parsed Data:", parsedData);
+        if (jsonObjects) {
+          jsonObjects.forEach((jsonStr) => {
+            try {
+              const parsedData = JSON.parse(jsonStr);
+              if (parsedData.event === "done") {
+                console.log("All responses are completed.");
+                const combinedMessages = arrayChat
+                  .map((chat) => chat.message)
+                  .join("\n");
 
-        // Handle the message content
-        const messageContent = parsedData.message?.content || "";
-        console.log("Message Content:", messageContent);
+                updateChat(combinedMessages);
+                buffer = "";
+                enableChat();
+                return;
+              }
+              console.log("Parsed Data:", parsedData.message?.type);
 
-        if (messageContent) {
-          setArrayChat((prev) => [
-            ...prev,
-            {
-              name: PROMPTS_NAME,
-              message: messageContent,
-              isImg: false,
-              date: currentDate(),
-              is_reply: "1",
-            },
-          ]);
+              if (
+                parsedData.message?.type === "answer" ||
+                parsedData.message?.type === "follow_up"
+              ) {
+                const messageContent = parsedData.message?.content || "";
+                const messageIndex = parsedData.index; // Use a unique index for grouping
+                console.log(
+                  "Message Content:",
+                  messageContent,
+                  "Index:",
+                  messageIndex
+                );
 
-          scrollChatBottom();
-        }
+                const type = parsedData.message?.type === "answer" ? "1" : "0";
 
-        if (parsedData.is_finish === true) {
-          console.log("Message finished, no more data expected.");
+                setArrayChat((prev) => {
+                  // Check if there's an existing message with the same index and random ID
+                  const existingMessageIndex = prev.findIndex(
+                    (msg) =>
+                      msg.index === messageIndex && msg.randomID === randomID
+                  );
+
+                  if (existingMessageIndex !== -1) {
+                    // Update the content of the existing message
+                    const updatedChat = [...prev];
+                    updatedChat[existingMessageIndex] = {
+                      ...updatedChat[existingMessageIndex],
+                      message:
+                        updatedChat[existingMessageIndex].message +
+                        messageContent, // Append to existing message
+                    };
+                    return updatedChat;
+                  } else {
+                    // Create a new message
+                    return [
+                      ...prev,
+                      {
+                        name: PROMPTS_NAME,
+                        message: messageContent,
+                        isImg: false,
+                        date: currentDate(),
+                        is_reply: type,
+                        index: messageIndex,
+                        randomID: randomID,
+                      },
+                    ];
+                  }
+                });
+
+                // Scroll to the bottom of the chat
+                scrollChatBottom();
+
+                if (parsedData.is_finish) {
+                  console.log("Message finished:", messageContent);
+                  buffer = "";
+                  console.log("ch", arrayChat);
+
+                  enableChat();
+                }
+              } else {
+                console.log("Different type");
+              }
+            } catch (parseError) {
+              console.error(
+                "Error parsing individual JSON object:",
+                parseError
+              );
+            }
+          });
+
+          // Clear buffer after processing JSON objects
           buffer = "";
-          enableChat();
-          return;
+          console.log("data", arrayChat);
         }
       } catch (e) {
         console.warn("Buffer does not yet contain complete JSON data.");
       }
     } catch (err) {
       console.error("Error processing chatbot response:", err);
-      enableChat(); // Ensure chat is enabled on error
+      enableChat(); // Ensure chat is enabled again if an error occurs
+    }
+  };
+  const updateChat = async (message) => {
+    // Loại bỏ chuỗi "Riokupon AI: " khỏi message
+    // const cleanMessage = message.replace("Riokupon AI: ", "");
+    console.log("1231232123", message);
+    try {
+      const response = await axios.post(
+        "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat",
+        {
+          user_id: "279573",
+          thread_id: "thread_lYgV8ip1IDPJk0jYsggtEJsD",
+          message: message,
+          is_mod: 2,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        console.log("Chat updated successfully:", response.data);
+      } else {
+        console.error("Failed to update chat:", response.status);
+      }
+    } catch (error) {
+      console.error("Error updating chat:", error);
     }
   };
 
@@ -264,7 +360,6 @@ const ChatComponent = () => {
                 style={{
                   body: { color: isAgent ? "#333" : "#fff", fontSize: 16 },
                 }}
-                // renderers={renderers}
               >
                 {message.message}
               </Markdown>
@@ -278,6 +373,17 @@ const ChatComponent = () => {
       </View>
     );
   };
+  const renderTypingIndicator = () => (
+    <View style={styles.body}>
+      <Image
+        source={require("../assets/images/icon.png")}
+        style={styles.chat_logo}
+      />
+      <View style={styles.dot_content}>
+        <LoadingDots />
+      </View>
+    </View>
+  );
 
   return (
     <KeyboardAvoidingView
@@ -301,6 +407,7 @@ const ChatComponent = () => {
         </View>
         {messages.map((msg) => renderMessageItem(msg))}
         {arrayChat.map((chat) => renderMessageItem(chat, true))}
+        {showTypingIndicator && renderTypingIndicator()}
       </ScrollView>
       <View style={styles.inputContainer}>
         <TextInput
@@ -375,6 +482,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     lineHeight: 20,
+  },
+  dot_content: {
+    alignItems: "flex-start",
+    marginVertical: 10,
+    borderRadius: 16,
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   timeHtm: {
     fontSize: 10,

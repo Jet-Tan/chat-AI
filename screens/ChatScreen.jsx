@@ -8,7 +8,7 @@ const ChatScreen = () => {
   return (
     <View style={styles.container}>
       <HeaderComponent />
-      <ChatTest />
+      <ChatComponent />
     </View>
   );
 };
