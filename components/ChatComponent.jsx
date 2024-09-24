@@ -58,7 +58,6 @@ const ChatComponent = () => {
     setIsWaitingForResponse(true);
     disableChat();
     const randomID = generateUniqueID();
-    console.log("chec", randomID);
     arrayChat.push({
       name: "User",
       message: prompt,
@@ -74,17 +73,16 @@ const ChatComponent = () => {
         : "assistant",
       content: msg.message,
     }));
-    console.log("checl", arrayMessages);
-    const params = new URLSearchParams();
+    const params = new FormData();
     params.append("array_chat", JSON.stringify(arrayMessages));
-    params.append("user_id", "279573");
-    params.append("thread_id", "thread_lYgV8ip1IDPJk0jYsggtEJsD");
+    params.append("user_id", USER_ID);
+    params.append("thread_id", THREAD_ID);
     params.append("message", prompt);
     params.append("is_mod", "0");
 
     console.log("dataaa", params);
     try {
-      const response = await axios.post(CHAT_PHP_URL, params.toString(), {
+      const response = await axios.post(CHAT_PHP_URL, params, {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
@@ -96,14 +94,12 @@ const ChatComponent = () => {
       console.error(`Error sending message: ${error}`);
       enableChat();
     } finally {
-      // Tắt hiển thị dấu 3 chấm khi phản hồi hoàn tất
       setShowTypingIndicator(false);
       setIsWaitingForResponse(false);
     }
   };
 
   let buffer = "";
-
   const streamChatCoze = (data, randomID) => {
     try {
       if (!data) {
@@ -116,7 +112,6 @@ const ChatComponent = () => {
         .map((line) => line.replace(/^data:\s*/, ""));
 
       buffer += lines.join("");
-      console.log("Current buffer:", buffer);
 
       try {
         const jsonObjects = buffer.match(/{.*?}(?={|$)/g);
@@ -125,76 +120,80 @@ const ChatComponent = () => {
           jsonObjects.forEach((jsonStr) => {
             try {
               const parsedData = JSON.parse(jsonStr);
+
               if (parsedData.event === "done") {
                 console.log("All responses are completed.");
-                const combinedMessages = arrayChat
-                  .map((chat) => chat.message)
-                  .join("\n");
-
-                updateChat(combinedMessages);
                 buffer = "";
                 enableChat();
                 return;
               }
-              console.log("Parsed Data:", parsedData.message?.type);
+              const messageIndex = parsedData.index;
+              const messageContent = parsedData.message?.content || "";
 
-              if (
-                parsedData.message?.type === "answer" ||
-                parsedData.message?.type === "follow_up"
-              ) {
-                const messageContent = parsedData.message?.content || "";
-                const messageIndex = parsedData.index; // Use a unique index for grouping
-                console.log(
-                  "Message Content:",
-                  messageContent,
-                  "Index:",
-                  messageIndex
-                );
+              if (parsedData.message?.type === "answer") {
+                console.log("Handling 'answer' type message:", messageContent);
 
-                const type = parsedData.message?.type === "answer" ? "1" : "0";
+                let answerMessage = "";
 
                 setArrayChat((prev) => {
-                  // Check if there's an existing message with the same index and random ID
                   const existingMessageIndex = prev.findIndex(
                     (msg) =>
                       msg.index === messageIndex && msg.randomID === randomID
                   );
 
                   if (existingMessageIndex !== -1) {
-                    // Update the content of the existing message
                     const updatedChat = [...prev];
                     updatedChat[existingMessageIndex] = {
                       ...updatedChat[existingMessageIndex],
                       message:
                         updatedChat[existingMessageIndex].message +
-                        messageContent, // Append to existing message
+                        messageContent,
                     };
+                    answerMessage = updatedChat[existingMessageIndex].message;
                     return updatedChat;
                   } else {
-                    // Create a new message
-                    return [
-                      ...prev,
-                      {
-                        name: PROMPTS_NAME,
-                        message: messageContent,
-                        isImg: false,
-                        date: currentDate(),
-                        is_reply: type,
-                        index: messageIndex,
-                        randomID: randomID,
-                      },
-                    ];
+                    const newMessage = {
+                      name: PROMPTS_NAME,
+                      message: messageContent,
+                      isImg: false,
+                      date: currentDate(),
+                      is_reply: "1",
+                      index: messageIndex,
+                      randomID: randomID,
+                    };
+                    answerMessage = newMessage.message;
+                    return [...prev, newMessage];
                   }
                 });
 
-                // Scroll to the bottom of the chat
-                scrollChatBottom();
-
                 if (parsedData.is_finish) {
-                  console.log("Message finished:", messageContent);
-                  buffer = "";
-                  console.log("ch", arrayChat);
+                  console.log("Completed answer message:", answerMessage);
+                  updateChat(answerMessage);
+                }
+              }
 
+              if (parsedData.message?.type === "follow_up") {
+                console.log(
+                  "Handling 'follow_up' type message:",
+                  messageContent
+                );
+                setArrayChat((prev) => [
+                  ...prev,
+                  {
+                    name: PROMPTS_NAME,
+                    message: messageContent,
+                    isImg: false,
+                    date: currentDate(),
+                    is_reply: "0",
+                    index: messageIndex,
+                    randomID: randomID,
+                    type: "follow_up",
+                  },
+                ]);
+
+                scrollChatBottom();
+                if (parsedData.is_finish) {
+                  buffer = "";
                   enableChat();
                 }
               } else {
@@ -208,34 +207,38 @@ const ChatComponent = () => {
             }
           });
 
-          // Clear buffer after processing JSON objects
           buffer = "";
-          console.log("data", arrayChat);
         }
       } catch (e) {
         console.warn("Buffer does not yet contain complete JSON data.");
       }
     } catch (err) {
       console.error("Error processing chatbot response:", err);
-      enableChat(); // Ensure chat is enabled again if an error occurs
+      enableChat();
     }
   };
+  const handleFollowUpPress = (message) => {
+    console.log("Message clicked:", message); // Kiểm tra tin nhắn được nhấn
+    setMessage(message);
+    sendUserChat();
+    scrollChatBottom();
+  };
+
   const updateChat = async (message) => {
-    // Loại bỏ chuỗi "Riokupon AI: " khỏi message
-    // const cleanMessage = message.replace("Riokupon AI: ", "");
-    console.log("1231232123", message);
+    const cleanMessage = message.replace("Riokupon AI: ", "");
     try {
       const response = await axios.post(
         "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat",
+
         {
-          user_id: "279573",
-          thread_id: "thread_lYgV8ip1IDPJk0jYsggtEJsD",
-          message: message,
+          user_id: USER_ID,
+          thread_id: THREAD_ID,
+          message: cleanMessage,
           is_mod: 2,
         },
         {
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
           },
         }
       );
@@ -319,10 +322,17 @@ const ChatComponent = () => {
   //     </TouchableOpacity>
   //   ),
   // };
+  function parseCustomDateString(dateString) {
+    const [day, month, yearAndTime] = dateString.split("/");
+    const [year, time] = yearAndTime.split(", ");
+    return new Date(`${year}-${month}-${day}T${time}`);
+  }
 
   const renderMessageItem = (message, isUserMessage = false) => {
     const isAgent = message.is_reply === "1";
-    const messageDate = new Date(message.time_created * 1000 || new Date());
+    const messageDate = message.time_created
+      ? new Date(message.time_created * 1000)
+      : parseCustomDateString(message.date);
     const now = new Date();
     const isToday = messageDate.toDateString() === now.toDateString();
     const isThisYear = messageDate.getFullYear() === now.getFullYear();
@@ -343,9 +353,15 @@ const ChatComponent = () => {
       : generateUniqueID(`msg_${message.time_created}_${Math.random()}`);
 
     return (
-      <View
+      <TouchableOpacity
         key={key}
         style={isAgent ? styles.agent_content : styles.user_content}
+        onPress={() => {
+          if (message.type === "follow_up") {
+            handleFollowUpPress(message.message);
+          }
+        }}
+        activeOpacity={1}
       >
         <View style={styles.body}>
           {isAgent && (
@@ -360,6 +376,7 @@ const ChatComponent = () => {
                 style={{
                   body: { color: isAgent ? "#333" : "#fff", fontSize: 16 },
                 }}
+                // renderers={renderers}
               >
                 {message.message}
               </Markdown>
@@ -370,7 +387,7 @@ const ChatComponent = () => {
             </Text>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
   const renderTypingIndicator = () => (
@@ -389,7 +406,7 @@ const ChatComponent = () => {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.select({ ios: 50, android: 50 })}
+      keyboardVerticalOffset={Platform.select({ ios: 50, android: 30 })}
     >
       <ScrollView ref={scrollViewRef} style={styles.scrollView}>
         <View style={styles.live_chat}>
