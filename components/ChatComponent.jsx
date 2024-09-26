@@ -10,6 +10,7 @@ import {
   Platform,
   Vibration,
   StyleSheet,
+  Keyboard,
 } from "react-native";
 import axios from "axios";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
@@ -42,15 +43,21 @@ const ChatComponent = () => {
   const enableChat = () => setIsWaitingForResponse(false);
 
   const sendUserChat = () => {
-    if (isWaitingForResponse || !message.trim()) return;
-
+    console.log("check data", message);
     const chat = message.trim();
-    setMessage("");
-    disableChat();
+    if (isWaitingForResponse || !chat) return;
+
     scrollChatBottom();
     getResponse(chat);
+    setMessage("");
+    disableChat();
   };
-
+  const sendFollowUp = (message) => {
+    if (isWaitingForResponse) return;
+    getResponse(message);
+    disableChat();
+    scrollChatBottom();
+  };
   const getResponse = async (prompt) => {
     if (isWaitingForResponse) return;
 
@@ -80,7 +87,7 @@ const ChatComponent = () => {
     params.append("message", prompt);
     params.append("is_mod", "0");
 
-    console.log("dataaa", params);
+    // const pollServer = async () => {
     try {
       const response = await axios.post(CHAT_PHP_URL, params, {
         headers: {
@@ -88,15 +95,23 @@ const ChatComponent = () => {
         },
       });
 
+      // Xử lý dữ liệu từ server
       streamChatCoze(response.data, randomID);
       scrollChatBottom();
+
+      // Sau khi nhận phản hồi, thực hiện long polling bằng cách gọi lại pollServer
+      // pollServer();
     } catch (error) {
-      console.error(`Error sending message: ${error}`);
-      enableChat();
+      console.error(`Error during long polling: ${error}`);
+      enableChat(); // Kích hoạt chat lại nếu có lỗi
     } finally {
       setShowTypingIndicator(false);
       setIsWaitingForResponse(false);
     }
+    // };
+
+    // Gọi long polling lần đầu tiên
+    // pollServer();
   };
 
   let buffer = "";
@@ -169,6 +184,8 @@ const ChatComponent = () => {
                 if (parsedData.is_finish) {
                   console.log("Completed answer message:", answerMessage);
                   updateChat(answerMessage);
+                  buffer = "";
+                  return;
                 }
               }
 
@@ -192,10 +209,6 @@ const ChatComponent = () => {
                 ]);
 
                 scrollChatBottom();
-                if (parsedData.is_finish) {
-                  buffer = "";
-                  enableChat();
-                }
               } else {
                 console.log("Different type");
               }
@@ -216,12 +229,6 @@ const ChatComponent = () => {
       console.error("Error processing chatbot response:", err);
       enableChat();
     }
-  };
-  const handleFollowUpPress = (message) => {
-    console.log("Message clicked:", message); // Kiểm tra tin nhắn được nhấn
-    setMessage(message);
-    sendUserChat();
-    scrollChatBottom();
   };
 
   const updateChat = async (message) => {
@@ -299,6 +306,7 @@ const ChatComponent = () => {
   useEffect(() => {
     scrollChatBottom();
   }, [arrayChat, messages]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       scrollChatBottom();
@@ -306,22 +314,6 @@ const ChatComponent = () => {
     return () => clearTimeout(timer);
   }, [arrayChat, messages]);
 
-  // const renderers = {
-  //   image: ({ src }) => (
-  //     <Image
-  //       source={{ uri: src }}
-  //       style={{ width: 200, height: 200 }}
-  //       resizeMode="contain"
-  //     />
-  //   ),
-  //   link: ({ children, href }) => (
-  //     <TouchableOpacity onPress={() => Linking.openURL(href)}>
-  //       <Text style={{ color: "blue", textDecorationLine: "underline" }}>
-  //         {children}
-  //       </Text>
-  //     </TouchableOpacity>
-  //   ),
-  // };
   function parseCustomDateString(dateString) {
     const [day, month, yearAndTime] = dateString.split("/");
     const [year, time] = yearAndTime.split(", ");
@@ -358,7 +350,7 @@ const ChatComponent = () => {
         style={isAgent ? styles.agent_content : styles.user_content}
         onPress={() => {
           if (message.type === "follow_up") {
-            handleFollowUpPress(message.message);
+            sendFollowUp(message.message);
           }
         }}
         activeOpacity={1}
@@ -401,12 +393,14 @@ const ChatComponent = () => {
       </View>
     </View>
   );
-
+  const handleTextChange = useCallback((text) => {
+    setMessage(text);
+  }, []);
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.select({ ios: 50, android: 30 })}
+      keyboardVerticalOffset={Platform.select({ ios: 50, android: 50 })}
     >
       <ScrollView ref={scrollViewRef} style={styles.scrollView}>
         <View style={styles.live_chat}>
@@ -431,9 +425,10 @@ const ChatComponent = () => {
           style={styles.input}
           placeholder="Nhập tin nhắn của bạn"
           value={message}
-          onChangeText={setMessage}
-          onSubmitEditing={sendUserChat}
+          onChangeText={handleTextChange}
           editable={!isWaitingForResponse}
+          onSubmitEditing={sendUserChat}
+          blurOnSubmit={false}
         />
         <TouchableOpacity
           onPress={sendUserChat}
@@ -499,6 +494,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     lineHeight: 20,
+    textAlign: "center",
   },
   dot_content: {
     alignItems: "flex-start",
