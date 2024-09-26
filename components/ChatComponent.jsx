@@ -11,6 +11,7 @@ import {
   Vibration,
   StyleSheet,
   Keyboard,
+  RefreshControl,
 } from "react-native";
 import axios from "axios";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
@@ -29,6 +30,8 @@ const ChatComponent = () => {
   const [message, setMessage] = useState("");
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const [showTypingIndicator, setShowTypingIndicator] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [abortController, setAbortController] = useState(null);
 
   const scrollViewRef = useRef(null);
 
@@ -46,20 +49,26 @@ const ChatComponent = () => {
     console.log("check data", message);
     const chat = message.trim();
     if (isWaitingForResponse || !chat) return;
-
-    scrollChatBottom();
+    disableChat();
     getResponse(chat);
     setMessage("");
-    disableChat();
-  };
-  const sendFollowUp = (message) => {
-    if (isWaitingForResponse) return;
-    getResponse(message);
-    disableChat();
     scrollChatBottom();
   };
+  const sendFollowUp = async (message) => {
+    if (isWaitingForResponse) return;
+
+    disableChat(); // Vô hiệu hóa chat
+    await getResponse(message); // Gọi hàm để nhận phản hồi
+
+    // Lúc này, chúng ta cần cuộn xuống
+    scrollChatBottom(); // Cuộn xuống dưới sau khi gửi
+  };
+
   const getResponse = async (prompt) => {
     if (isWaitingForResponse) return;
+
+    const controller = new AbortController();
+    setAbortController(controller);
 
     setShowTypingIndicator(true);
     setIsWaitingForResponse(true);
@@ -87,31 +96,27 @@ const ChatComponent = () => {
     params.append("message", prompt);
     params.append("is_mod", "0");
 
-    // const pollServer = async () => {
     try {
       const response = await axios.post(CHAT_PHP_URL, params, {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
+        signal: controller.signal, // Gửi tín hiệu hủy
       });
 
       // Xử lý dữ liệu từ server
       streamChatCoze(response.data, randomID);
-      scrollChatBottom();
-
-      // Sau khi nhận phản hồi, thực hiện long polling bằng cách gọi lại pollServer
-      // pollServer();
     } catch (error) {
-      console.error(`Error during long polling: ${error}`);
-      enableChat(); // Kích hoạt chat lại nếu có lỗi
+      if (axios.isCancel(error)) {
+        console.log("Request canceled:", error.message); // Thông báo yêu cầu bị hủy
+      } else {
+        console.error(`Error during long polling: ${error}`);
+      }
+      enableChat();
     } finally {
       setShowTypingIndicator(false);
       setIsWaitingForResponse(false);
     }
-    // };
-
-    // Gọi long polling lần đầu tiên
-    // pollServer();
   };
 
   let buffer = "";
@@ -127,7 +132,7 @@ const ChatComponent = () => {
         .map((line) => line.replace(/^data:\s*/, ""));
 
       buffer += lines.join("");
-
+      let answerMessage = "";
       try {
         const jsonObjects = buffer.match(/{.*?}(?={|$)/g);
 
@@ -144,11 +149,13 @@ const ChatComponent = () => {
               }
               const messageIndex = parsedData.index;
               const messageContent = parsedData.message?.content || "";
-
-              if (parsedData.message?.type === "answer") {
+              if (
+                parsedData.message?.type === "answer" &&
+                parsedData.message?.role === "assistant"
+              ) {
                 console.log("Handling 'answer' type message:", messageContent);
-
-                let answerMessage = "";
+                // Cập nhật phản hồi từ server vào `answerMessage`
+                answerMessage += messageContent;
 
                 setArrayChat((prev) => {
                   const existingMessageIndex = prev.findIndex(
@@ -158,13 +165,7 @@ const ChatComponent = () => {
 
                   if (existingMessageIndex !== -1) {
                     const updatedChat = [...prev];
-                    updatedChat[existingMessageIndex] = {
-                      ...updatedChat[existingMessageIndex],
-                      message:
-                        updatedChat[existingMessageIndex].message +
-                        messageContent,
-                    };
-                    answerMessage = updatedChat[existingMessageIndex].message;
+                    updatedChat[existingMessageIndex].message += messageContent;
                     return updatedChat;
                   } else {
                     const newMessage = {
@@ -176,15 +177,15 @@ const ChatComponent = () => {
                       index: messageIndex,
                       randomID: randomID,
                     };
-                    answerMessage = newMessage.message;
                     return [...prev, newMessage];
                   }
                 });
 
                 if (parsedData.is_finish) {
                   console.log("Completed answer message:", answerMessage);
-                  updateChat(answerMessage);
                   buffer = "";
+                  updateChat(answerMessage);
+
                   return;
                 }
               }
@@ -200,17 +201,15 @@ const ChatComponent = () => {
                     name: PROMPTS_NAME,
                     message: messageContent,
                     isImg: false,
-                    date: currentDate(),
                     is_reply: "0",
                     index: messageIndex,
+                    date: currentDate(),
                     randomID: randomID,
                     type: "follow_up",
                   },
                 ]);
 
                 scrollChatBottom();
-              } else {
-                console.log("Different type");
               }
             } catch (parseError) {
               console.error(
@@ -236,23 +235,16 @@ const ChatComponent = () => {
     try {
       const response = await axios.post(
         "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat",
-
         {
           user_id: USER_ID,
           thread_id: THREAD_ID,
           message: cleanMessage,
           is_mod: 2,
         },
-        {
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-        }
+        { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
       );
 
-      if (response.status === 200) {
-        console.log("Chat updated successfully:", response.data);
-      } else {
+      if (response.status !== 200) {
         console.error("Failed to update chat:", response.status);
       }
     } catch (error) {
@@ -260,57 +252,54 @@ const ChatComponent = () => {
     }
   };
 
-  useEffect(() => {
-    const fetchChatData = async () => {
-      const timestamp = Math.floor(Date.now() / 1000);
-      const apiUrl = `https://api.riokupon.com/vn/openai/assistant.php?action=get_messages&user_id=${USER_ID}&time=${timestamp}`;
+  const fetchChatData = async () => {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const apiUrl = `https://api.riokupon.com/vn/openai/assistant.php?action=get_messages&user_id=${USER_ID}&time=${timestamp}`;
 
-      try {
-        const response = await axios.get(apiUrl);
-        const data = response.data;
-        const messagesArray = Array.isArray(data) ? data : data.data || [];
+    try {
+      const response = await axios.get(apiUrl);
+      const data = response.data;
+      const messagesArray = Array.isArray(data) ? data : data.data || [];
 
-        messagesArray.sort((a, b) =>
-          a.time_created === b.time_created
-            ? a.id - b.id
-            : b.time_created - a.time_created
+      messagesArray.sort((a, b) =>
+        a.time_created === b.time_created
+          ? a.id - b.id
+          : b.time_created - a.time_created
+      );
+
+      const limitMessages = messagesArray.slice(0, 10);
+
+      setMessages((prevMessages) => {
+        const existingMessageIds = new Set(prevMessages.map((msg) => msg.id));
+
+        const newMessages = limitMessages.filter(
+          (msg) => !existingMessageIds.has(msg.id)
         );
 
-        const limitMessages = messagesArray.slice(0, 30);
+        if (newMessages.length > 0) {
+          Vibration.vibrate(200);
+        }
 
-        setMessages((prevMessages) => {
-          const existingMessageIds = new Set(prevMessages.map((msg) => msg.id));
-
-          const newMessages = limitMessages.filter(
-            (msg) => !existingMessageIds.has(msg.id)
-          );
-
-          if (newMessages.length > 0) {
-            Vibration.vibrate(200);
-          }
-
-          return [...prevMessages, ...newMessages].sort((a, b) =>
-            a.time_created === b.time_created
-              ? a.id - b.id
-              : a.time_created - b.time_created
-          );
-        });
-      } catch (error) {
-        console.error("Error fetching chat data:", error);
-      }
-    };
-
+        return [...prevMessages, ...newMessages].sort((a, b) =>
+          a.time_created === b.time_created
+            ? a.id - b.id
+            : a.time_created - b.time_created
+        );
+      });
+    } catch (error) {
+      console.error("Error fetching chat data:", error);
+    }
+  };
+  useEffect(() => {
     fetchChatData();
   }, []);
 
   useEffect(() => {
     scrollChatBottom();
-  }, [arrayChat, messages]);
+  }, [arrayChat, messages, showTypingIndicator]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollChatBottom();
-    }, 500);
+    const timer = setTimeout(scrollChatBottom, 500);
     return () => clearTimeout(timer);
   }, [arrayChat, messages]);
 
@@ -348,11 +337,9 @@ const ChatComponent = () => {
       <TouchableOpacity
         key={key}
         style={isAgent ? styles.agent_content : styles.user_content}
-        onPress={() => {
-          if (message.type === "follow_up") {
-            sendFollowUp(message.message);
-          }
-        }}
+        onPress={() =>
+          message.type === "follow_up" && sendFollowUp(message.message)
+        }
         activeOpacity={1}
       >
         <View style={styles.body}>
@@ -393,16 +380,52 @@ const ChatComponent = () => {
       </View>
     </View>
   );
+
   const handleTextChange = useCallback((text) => {
     setMessage(text);
   }, []);
+
+  const resetChat = () => {
+    setMessages([]);
+    setArrayChat([]);
+    setMessage("");
+    setIsWaitingForResponse(false);
+    setShowTypingIndicator(false);
+  };
+  // Hàm để reload lại dữ liệu
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+
+    // Hủy yêu cầu nếu đang có
+    if (abortController) {
+      abortController.abort();
+    }
+
+    resetChat();
+    fetchChatData();
+
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  }, [abortController]);
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.select({ ios: 50, android: 50 })}
     >
-      <ScrollView ref={scrollViewRef} style={styles.scrollView}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={{ flexGrow: 1 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        onContentSizeChange={() => {
+          scrollChatBottom();
+        }}
+      >
         <View style={styles.live_chat}>
           <Text style={styles.live_chat_text}>
             Nội dung chỉ mang tính tham khảo, để được hỗ trợ chính xác nhất hãy
@@ -416,9 +439,11 @@ const ChatComponent = () => {
             Riokupon AI đang trực tuyến
           </Text>
         </View>
-        {messages.map((msg) => renderMessageItem(msg))}
-        {arrayChat.map((chat) => renderMessageItem(chat, true))}
-        {showTypingIndicator && renderTypingIndicator()}
+        <View>
+          {messages.map((msg) => renderMessageItem(msg))}
+          {arrayChat.map((chat) => renderMessageItem(chat, true))}
+          {showTypingIndicator && renderTypingIndicator()}
+        </View>
       </ScrollView>
       <View style={styles.inputContainer}>
         <TextInput
@@ -530,7 +555,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   scrollView: {
-    flex: 1,
     paddingHorizontal: 8,
     paddingBottom: 50,
   },
