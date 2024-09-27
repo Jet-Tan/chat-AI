@@ -311,10 +311,10 @@ const ChatComponent = () => {
     return moment(
       cleanedDateString,
       [
-        "M/D/YYYY, h:mm:ss A", // 9/27/2024, 3:01:33 PM
-        "M/D/YYYY, HH:mm:ss", // 9/27/2024, 14:01:33
-        "D/M/YYYY, HH:mm:ss", // 27/9/2024, 14:01:33
-        "D/M/YYYY, h:mm:ss A", // 27/9/2024, 3:01:33 PM
+        "M/D/YYYY, h:mm:ss A",
+        "M/D/YYYY, HH:mm:ss",
+        "D/M/YYYY, HH:mm:ss",
+        "D/M/YYYY, h:mm:ss A",
       ],
       true
     ).toDate();
@@ -326,12 +326,11 @@ const ChatComponent = () => {
       ? new Date(message.time_created * 1000) // Dữ liệu thời gian dạng timestamp
       : parseCustomDateString(message.date); // Dữ liệu thời gian dạng chuỗi
 
-    // Kiểm tra tính hợp lệ của `messageDate`
     if (isNaN(messageDate)) {
       console.error(
         `Invalid date format: ${message.date || message.time_created}`
       );
-      return null; // Hoặc xử lý lỗi theo cách của bạn
+      return null;
     }
 
     const now = new Date(); // Thời gian hiện tại
@@ -350,7 +349,7 @@ const ChatComponent = () => {
         ? moment(messageDate).format("MM/DD") // Hiển thị tháng/ngày nếu cùng năm
         : moment(messageDate).format("YYYY/MM/DD"); // Hiển thị đầy đủ nếu khác năm
     }
-    console.log(`Formatted Date: ${dateHtm} ${timeHtm}`);
+
     const key = message.id
       ? message.id.toString()
       : generateUniqueID(`msg_${message.time_created}_${Math.random()}`);
