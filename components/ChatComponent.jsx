@@ -55,14 +55,11 @@ const ChatComponent = () => {
     setMessage("");
     scrollChatBottom();
   };
-  const sendFollowUp = async (message) => {
+  const sendFollowUp = (message) => {
     if (isWaitingForResponse) return;
-
-    disableChat(); // Vô hiệu hóa chat
-    await getResponse(message); // Gọi hàm để nhận phản hồi
-
-    // Lúc này, chúng ta cần cuộn xuống
-    scrollChatBottom(); // Cuộn xuống dưới sau khi gửi
+    disableChat();
+    getResponse(message);
+    scrollChatBottom();
   };
 
   const getResponse = async (prompt) => {
