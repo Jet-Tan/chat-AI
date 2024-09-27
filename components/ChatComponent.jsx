@@ -18,6 +18,7 @@ import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import EventSource from "react-native-sse";
 import Markdown from "react-native-markdown-display";
 import LoadingDots from "./LoadingDots";
+import moment from "moment";
 const CHAT_PHP_URL =
   "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat";
 const USER_ID = "279573";
@@ -99,7 +100,7 @@ const ChatComponent = () => {
     try {
       const response = await axios.post(CHAT_PHP_URL, params, {
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Type": "multipart/form-data",
         },
         signal: controller.signal, // Gửi tín hiệu hủy
       });
@@ -218,7 +219,7 @@ const ChatComponent = () => {
               );
             }
           });
-
+          console.log("check", arrayChat);
           buffer = "";
         }
       } catch (e) {
@@ -304,31 +305,52 @@ const ChatComponent = () => {
   }, [arrayChat, messages]);
 
   function parseCustomDateString(dateString) {
-    const [day, month, yearAndTime] = dateString.split("/");
-    const [year, time] = yearAndTime.split(", ");
-    return new Date(`${year}-${month}-${day}T${time}`);
+    // Thay thế ký tự đặc biệt `\u202F` bằng một khoảng trắng thường
+    const cleanedDateString = dateString.replace(/\u202F/g, " ");
+
+    return moment(
+      cleanedDateString,
+      [
+        "M/D/YYYY, h:mm:ss A", // 9/27/2024, 3:01:33 PM
+        "M/D/YYYY, HH:mm:ss", // 9/27/2024, 14:01:33
+        "D/M/YYYY, HH:mm:ss", // 27/9/2024, 14:01:33
+        "D/M/YYYY, h:mm:ss A", // 27/9/2024, 3:01:33 PM
+      ],
+      true
+    ).toDate();
   }
 
   const renderMessageItem = (message, isUserMessage = false) => {
     const isAgent = message.is_reply === "1";
     const messageDate = message.time_created
-      ? new Date(message.time_created * 1000)
-      : parseCustomDateString(message.date);
-    const now = new Date();
-    const isToday = messageDate.toDateString() === now.toDateString();
-    const isThisYear = messageDate.getFullYear() === now.getFullYear();
-    const timeHtm = messageDate.toLocaleTimeString();
+      ? new Date(message.time_created * 1000) // Dữ liệu thời gian dạng timestamp
+      : parseCustomDateString(message.date); // Dữ liệu thời gian dạng chuỗi
 
+    // Kiểm tra tính hợp lệ của `messageDate`
+    if (isNaN(messageDate)) {
+      console.error(
+        `Invalid date format: ${message.date || message.time_created}`
+      );
+      return null; // Hoặc xử lý lỗi theo cách của bạn
+    }
+
+    const now = new Date(); // Thời gian hiện tại
+
+    // Kiểm tra nếu tin nhắn là của hôm nay hoặc cùng năm
+    const isToday = moment(messageDate).isSame(now, "day"); // Kiểm tra cùng ngày
+    const isThisYear = moment(messageDate).isSame(now, "year"); // Kiểm tra cùng năm
+
+    // Lấy thời gian định dạng "HH:mm:ss"
+    const timeHtm = moment(messageDate).format("HH:mm:ss");
+
+    // Định dạng hiển thị ngày (nếu không phải hôm nay)
     let dateHtm = "";
     if (!isToday) {
       dateHtm = isThisYear
-        ? messageDate.toLocaleDateString(undefined, {
-            month: "2-digit",
-            day: "2-digit",
-          })
-        : messageDate.toLocaleDateString();
+        ? moment(messageDate).format("MM/DD") // Hiển thị tháng/ngày nếu cùng năm
+        : moment(messageDate).format("YYYY/MM/DD"); // Hiển thị đầy đủ nếu khác năm
     }
-
+    console.log(`Formatted Date: ${dateHtm} ${timeHtm}`);
     const key = message.id
       ? message.id.toString()
       : generateUniqueID(`msg_${message.time_created}_${Math.random()}`);
@@ -349,7 +371,7 @@ const ChatComponent = () => {
               style={styles.chat_logo}
             />
           )}
-          <View>
+          <View style={{ with: "100%" }}>
             <View style={isAgent ? styles.agent_message : styles.user_message}>
               <Markdown
                 style={{
@@ -360,10 +382,11 @@ const ChatComponent = () => {
                 {message.message}
               </Markdown>
             </View>
-
-            <Text style={isAgent ? styles.timeHtm : styles.timeHtmUser}>
-              {dateHtm && `${dateHtm} `} {timeHtm}
-            </Text>
+            <View>
+              <Text style={isAgent ? styles.timeHtm : styles.timeHtmUser}>
+                {dateHtm && `${dateHtm} `} {timeHtm}
+              </Text>
+            </View>
           </View>
         </View>
       </TouchableOpacity>
@@ -519,7 +542,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     lineHeight: 20,
-    textAlign: "center",
+    alignSelf: "flex-end",
   },
   dot_content: {
     alignItems: "flex-start",
