@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Keyboard,
   RefreshControl,
+  FlatList,
 } from "react-native";
 import axios from "axios";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
@@ -19,6 +20,7 @@ import EventSource from "react-native-sse";
 import Markdown from "react-native-markdown-display";
 import LoadingDots from "./LoadingDots";
 import moment from "moment";
+
 const CHAT_PHP_URL =
   "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat";
 const USER_ID = "279573";
@@ -69,6 +71,7 @@ const ChatComponent = () => {
     setAbortController(controller);
 
     setShowTypingIndicator(true);
+
     setIsWaitingForResponse(true);
     disableChat();
     const randomID = generateUniqueID();
@@ -151,10 +154,9 @@ const ChatComponent = () => {
                 parsedData.message?.type === "answer" &&
                 parsedData.message?.role === "assistant"
               ) {
-                console.log("Handling 'answer' type message:", messageContent);
                 // Cập nhật phản hồi từ server vào `answerMessage`
                 answerMessage += messageContent;
-
+                console.log("Handling 'answer' type message:", answerMessage);
                 setArrayChat((prev) => {
                   const existingMessageIndex = prev.findIndex(
                     (msg) =>
@@ -444,6 +446,7 @@ const ChatComponent = () => {
         onContentSizeChange={() => {
           scrollChatBottom();
         }}
+        onLayout={() => scrollChatBottom()}
       >
         <View style={styles.live_chat}>
           <Text style={styles.live_chat_text}>
@@ -464,6 +467,7 @@ const ChatComponent = () => {
           {showTypingIndicator && renderTypingIndicator()}
         </View>
       </ScrollView>
+
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
@@ -576,6 +580,7 @@ const styles = StyleSheet.create({
   scrollView: {
     paddingHorizontal: 8,
     paddingBottom: 50,
+    flex: 1,
   },
   inputContainer: {
     flexDirection: "row",
