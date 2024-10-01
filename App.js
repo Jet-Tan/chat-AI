@@ -1,36 +1,12 @@
 import React from "react";
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
-import { StyleSheet, View, StatusBar } from "react-native";
-import ChatScreen from "./screens/ChatScreen";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import ChatScreen from "./src/screens/ChatSreen/ChatScreen";
+import LoginScreen from "./src/screens/AuthScreen/LoginScreen";
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AppContent />
+      <LoginScreen />
     </SafeAreaProvider>
   );
 }
-
-function AppContent() {
-  const insets = useSafeAreaInsets();
-
-  return (
-    <View
-      style={[
-        styles.container,
-        { paddingTop: insets.top, paddingBottom: insets.bottom },
-      ]}
-    >
-      <ChatScreen />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});

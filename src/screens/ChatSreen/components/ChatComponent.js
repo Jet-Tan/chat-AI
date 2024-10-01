@@ -10,7 +10,6 @@ import {
   Platform,
   Vibration,
   StyleSheet,
-  Keyboard,
   RefreshControl,
   FlatList,
 } from "react-native";
@@ -18,7 +17,7 @@ import axios from "axios";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import EventSource from "react-native-sse";
 import Markdown from "react-native-markdown-display";
-import LoadingDots from "./LoadingDots";
+import LoadingDots from "../../../components/LoadingDots";
 import moment from "moment";
 
 const CHAT_PHP_URL =
@@ -35,7 +34,6 @@ const ChatComponent = () => {
   const [showTypingIndicator, setShowTypingIndicator] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [abortController, setAbortController] = useState(null);
-
   const scrollViewRef = useRef(null);
 
   const currentDate = () => new Date().toLocaleString();
@@ -49,7 +47,6 @@ const ChatComponent = () => {
   const enableChat = () => setIsWaitingForResponse(false);
 
   const sendUserChat = () => {
-    console.log("check data", message);
     const chat = message.trim();
     if (isWaitingForResponse || !chat) return;
     disableChat();
@@ -105,11 +102,10 @@ const ChatComponent = () => {
         signal: controller.signal, // Gửi tín hiệu hủy
       });
 
-      // Xử lý dữ liệu từ server
       streamChatCoze(response.data, randomID);
     } catch (error) {
       if (axios.isCancel(error)) {
-        console.log("Request canceled:", error.message); // Thông báo yêu cầu bị hủy
+        console.log("Request canceled:", error.message);
       } else {
         console.error(`Error during long polling: ${error}`);
       }
@@ -143,7 +139,6 @@ const ChatComponent = () => {
               const parsedData = JSON.parse(jsonStr);
 
               if (parsedData.event === "done") {
-                console.log("All responses are completed.");
                 buffer = "";
                 enableChat();
                 return;
@@ -154,7 +149,6 @@ const ChatComponent = () => {
                 parsedData.message?.type === "answer" &&
                 parsedData.message?.role === "assistant"
               ) {
-                // Cập nhật phản hồi từ server vào `answerMessage`
                 answerMessage += messageContent;
                 console.log("Handling 'answer' type message:", answerMessage);
                 setArrayChat((prev) => {
@@ -277,7 +271,7 @@ const ChatComponent = () => {
         );
 
         if (newMessages.length > 0) {
-          Vibration.vibrate(200);
+          // Vibration.vibrate(200);
         }
 
         return [...prevMessages, ...newMessages].sort((a, b) =>
@@ -304,16 +298,30 @@ const ChatComponent = () => {
   }, [arrayChat, messages]);
 
   function parseCustomDateString(dateString) {
-    // Thay thế ký tự đặc biệt `\u202F` bằng một khoảng trắng thường
     const cleanedDateString = dateString.replace(/\u202F/g, " ");
 
+    // Tách chuỗi ngày tháng để xác định định dạng
+    const parts = cleanedDateString.split(/[,\s]+/); // Tách theo khoảng trắng và dấu phẩy
+    const datePart = parts[0].split("/"); // Tách phần ngày tháng
+
+    // Kiểm tra định dạng ngày và tháng
+    if (datePart.length === 3) {
+      const [day, month] = datePart;
+
+      // Nếu phần đầu nhỏ hơn 13, thì đây là trường hợp đặc biệt cần xác định lại
+      if (parseInt(day) <= 12) {
+        return moment(cleanedDateString, "D/M/YYYY, HH:mm:ss", true).toDate();
+      }
+    }
+
+    // Trường hợp mặc định, vẫn dùng định dạng thông thường nếu không khớp đặc biệt
     return moment(
       cleanedDateString,
       [
-        "M/D/YYYY, h:mm:ss A",
-        "M/D/YYYY, HH:mm:ss",
-        "D/M/YYYY, HH:mm:ss",
-        "D/M/YYYY, h:mm:ss A",
+        "M/D/YYYY, h:mm:ss A", // Định dạng tháng/ngày/năm
+        "M/D/YYYY, HH:mm:ss", // Định dạng tháng/ngày/năm với 24 giờ
+        "D/M/YYYY, HH:mm:ss", // Định dạng ngày/tháng/năm với 24 giờ
+        "D/M/YYYY, h:mm:ss A", // Định dạng ngày/tháng/năm
       ],
       true
     ).toDate();
@@ -321,9 +329,10 @@ const ChatComponent = () => {
 
   const renderMessageItem = (message, isUserMessage = false) => {
     const isAgent = message.is_reply === "1";
+
     const messageDate = message.time_created
-      ? new Date(message.time_created * 1000) // Dữ liệu thời gian dạng timestamp
-      : parseCustomDateString(message.date); // Dữ liệu thời gian dạng chuỗi
+      ? new Date(message.time_created * 1000)
+      : parseCustomDateString(message.date);
 
     if (isNaN(messageDate)) {
       console.error(
@@ -332,22 +341,25 @@ const ChatComponent = () => {
       return null;
     }
 
-    const now = new Date(); // Thời gian hiện tại
+    const now = new Date();
 
-    // Kiểm tra nếu tin nhắn là của hôm nay hoặc cùng năm
-    const isToday = moment(messageDate).isSame(now, "day"); // Kiểm tra cùng ngày
-    const isThisYear = moment(messageDate).isSame(now, "year"); // Kiểm tra cùng năm
+    // Chuyển sang múi giờ cục bộ để so sánh ngày
+    const isToday = moment(messageDate)
+      .local()
+      .isSame(moment(now).local(), "day");
+    const isThisYear = moment(messageDate)
+      .local()
+      .isSame(moment(now).local(), "year");
 
-    // Lấy thời gian định dạng "HH:mm:ss"
-    const timeHtm = moment(messageDate).format("HH:mm:ss");
+    const timeHtm = moment(messageDate).local().format("HH:mm:ss");
 
-    // Định dạng hiển thị ngày (nếu không phải hôm nay)
-    let dateHtm = "";
-    if (!isToday) {
-      dateHtm = isThisYear
-        ? moment(messageDate).format("MM/DD") // Hiển thị tháng/ngày nếu cùng năm
-        : moment(messageDate).format("YYYY/MM/DD"); // Hiển thị đầy đủ nếu khác năm
-    }
+    const dateHtm = isToday
+      ? ""
+      : isThisYear
+      ? moment(messageDate).local().format("MM/DD") // Hiển thị tháng/ngày nếu cùng năm
+      : moment(messageDate).local().format("YYYY/MM/DD"); // Hiển thị đầy đủ nếu khác năm
+
+    const displayDate = isToday ? timeHtm : `${dateHtm} ${timeHtm}`.trim();
 
     const key = message.id
       ? message.id.toString()
@@ -365,24 +377,23 @@ const ChatComponent = () => {
         <View style={styles.body}>
           {isAgent && (
             <Image
-              source={require("../assets/images/icon.png")}
+              source={require("../../../assets/images/icon.png")}
               style={styles.chat_logo}
             />
           )}
-          <View style={{ with: "100%" }}>
+          <View style={{ width: "100%" }}>
             <View style={isAgent ? styles.agent_message : styles.user_message}>
               <Markdown
                 style={{
                   body: { color: isAgent ? "#333" : "#fff", fontSize: 16 },
                 }}
-                // renderers={renderers}
               >
                 {message.message}
               </Markdown>
             </View>
             <View>
               <Text style={isAgent ? styles.timeHtm : styles.timeHtmUser}>
-                {dateHtm && `${dateHtm} `} {timeHtm}
+                {displayDate}
               </Text>
             </View>
           </View>
@@ -390,10 +401,11 @@ const ChatComponent = () => {
       </TouchableOpacity>
     );
   };
+
   const renderTypingIndicator = () => (
     <View style={styles.body}>
       <Image
-        source={require("../assets/images/icon.png")}
+        source={require("../../../assets/images/icon.png")}
         style={styles.chat_logo}
       />
       <View style={styles.dot_content}>
@@ -413,7 +425,6 @@ const ChatComponent = () => {
     setIsWaitingForResponse(false);
     setShowTypingIndicator(false);
   };
-  // Hàm để reload lại dữ liệu
   const onRefresh = useCallback(() => {
     setRefreshing(true);
 
@@ -434,7 +445,7 @@ const ChatComponent = () => {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.select({ ios: 50, android: 50 })}
+      keyboardVerticalOffset={Platform.select({ ios: 100, android: 50 })}
     >
       <ScrollView
         ref={scrollViewRef}
@@ -454,7 +465,7 @@ const ChatComponent = () => {
             gửi tin nhắn tại
           </Text>
           <Image
-            source={require("../assets/images/icon.png")}
+            source={require("../../../assets/images/icon.png")}
             style={styles.live_logo}
           />
           <Text style={styles.live_chat_status}>
@@ -535,6 +546,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     lineHeight: 20,
+    alignSelf: "flex-start",
   },
   user_message: {
     backgroundColor: "#0a7cff",
