@@ -19,14 +19,18 @@ import { LinearGradient } from "expo-linear-gradient";
 // import Swiper from "react-native-swiper";
 import axios from "axios";
 import { useNavigation } from "@react-navigation/native";
-const { width, height } = Dimensions.get("window");
-
+import { appColors } from "../../constants/appColors";
+import { appInfo } from "../../constants/appInfos";
+import FontAwesome from "react-native-vector-icons/FontAwesome";
+import firebase from "firebase/compat/app";
+import "firebase/compat/auth";
 const LoginScreen = () => {
   const scrollViewRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userInput, setUserInput] = useState("");
   const [refValue, setRefValue] = useState("");
-  // const navigation = useNavigation();
+  const [loading, setLoading] = useState(false);
+  const navigation = useNavigation();
   const slides = [
     require("../../assets/images/slide1.png"),
     require("../../assets/images/slide2.png"),
@@ -38,7 +42,7 @@ const LoginScreen = () => {
     const nextIndex = (currentIndex + 1) % slides.length;
     setCurrentIndex(nextIndex);
     scrollViewRef.current.scrollTo({
-      x: nextIndex * width,
+      x: nextIndex * appInfo.sizes.WIDTH,
       animated: true,
     });
   };
@@ -49,11 +53,11 @@ const LoginScreen = () => {
   }, [currentIndex]);
 
   // Xử lý khi nhấn vào nút "Bắt Đầu"
-  const handleLogin = async () => {
+  const handleLogin = () => {
     const regexEmail = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
     const regexPhone = /^\d{10,}$/;
-    let email = "",
-      phone = "";
+    let phone = "";
+    let email = "";
 
     if (regexEmail.test(userInput)) {
       email = userInput;
@@ -62,40 +66,71 @@ const LoginScreen = () => {
     } else {
       Alert.alert(
         "Thông báo",
-        "Vui lòng nhập vào email hoặc số điện thoại hợp lệ"
+        "Vui lòng nhập vào email hoặc số điện thoại hợp lệ",
+        [{ text: "Đóng" }]
       );
       return;
     }
 
-    // Gọi API đăng ký hoặc đăng nhập
-    try {
-      const response = await axios.post(
+    setLoading(true);
+
+    const formData = new URLSearchParams();
+    formData.append("tp", "account");
+    formData.append("account_action", "loginUser");
+    formData.append("login_type", "ep");
+    formData.append("email", email);
+    formData.append("phone", phone);
+
+    axios
+      .post(
         "https://account.riokupon.com/api/account.php",
+        formData.toString(),
         {
-          tp: "account",
-          account_action: "loginUser",
-          login_type: "ep",
-          email: email,
-          phone: phone,
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
         }
-      );
-      console.log("check", response);
-      if (response.data.errors) {
-        // Nếu có lỗi, hiển thị thông báo lỗi
-        Alert.alert("Lỗi", response.data.errors.message);
-      } else if (response.data.success) {
-        Alert.alert("Thành công", response.data.success.message);
-        // Điều hướng người dùng sang trang xác minh
-        if (phone) {
-          // Ví dụ: điều hướng với React Navigation
-          // navigation.navigate('VerifyScreen', { phone });
-        } else {
-          // navigation.navigate('VerifyScreen', { email });
+      )
+      .then((response) => {
+        console.log("Full response:", response);
+        console.log("Status:", response.status);
+        console.log("Headers:", response.headers);
+        console.log("Data:", response.data);
+
+        const data = response.data;
+        setLoading(false);
+        if (data.errors) {
+          if (data.errors.message === "register") {
+            navigation.navigate("RegisterScreen");
+            return;
+          }
+
+          Alert.alert("Thông báo", data.errors.message, [
+            {
+              text: "Đăng nhập bằng Facebook",
+              onPress: () => {
+                // Thêm logic đăng nhập bằng Facebook tại đây nếu có
+              },
+            },
+            { text: "Đóng", style: "cancel" },
+          ]);
+          return;
         }
-      }
-    } catch (error) {
-      Alert.alert("Lỗi", "Không thể kết nối tới máy chủ.");
-    }
+
+        if (data.success) {
+          if (phone) {
+            navigation.navigate("Verification", { phone });
+          } else {
+            navigation.navigate("Verification", { email });
+          }
+        }
+      })
+      .catch((error) => {
+        setLoading(false);
+        Alert.alert("Thông báo", "Đã xảy ra lỗi, vui lòng thử lại.", [
+          { text: "Đóng" },
+        ]);
+      });
   };
 
   return (
@@ -103,7 +138,7 @@ const LoginScreen = () => {
       <KeyboardAvoidingView
         style={[
           styles.container,
-          { backgroundColor: currentIndex === 0 ? "#fff8ee" : "#fff" },
+          { backgroundColor: currentIndex === 0 ? "#fff8ee" : appColors.white },
         ]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
@@ -114,7 +149,7 @@ const LoginScreen = () => {
           pagingEnabled
           onScroll={(event) => {
             const slideIndex = Math.round(
-              event.nativeEvent.contentOffset.x / width
+              event.nativeEvent.contentOffset.x / appInfo.sizes.WIDTH
             );
             setCurrentIndex(slideIndex);
           }}
@@ -151,10 +186,15 @@ const LoginScreen = () => {
           ))}
         </ScrollView>
 
-        {/* Form Container nằm ngay dưới phần Slide */}
         <View style={styles.formContainer}>
           <View style={styles.formWrapper}>
             <View style={styles.formGroup}>
+              <FontAwesome
+                name="user-circle-o"
+                size={26}
+                color={appColors.orange}
+                style={styles.icon}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="Nhập số điện thoại (Zalo) hoặc Email"
@@ -166,7 +206,7 @@ const LoginScreen = () => {
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={styles.button}
-                onPress={() => {}}
+                onPress={handleLogin}
                 accessibilityLabel="Bắt đầu"
               >
                 <Text style={styles.buttonText}>Bắt Đầu</Text>
@@ -175,11 +215,13 @@ const LoginScreen = () => {
           </View>
         </View>
 
-        {/* Phần văn bản mô tả điều khoản */}
         <View style={styles.metaWrapper}>
           <Text style={styles.metaText}>
-            Đã có tài khoản, đăng nhập bằng{" "}
-            <Text style={styles.linkText} onPress={() => {}}>
+            Đã có tài khoản, đăng nhập bằng{"\n"}
+            <Text
+              style={styles.linkText}
+              onPress={() => navigation.navigate("VerificationFB")}
+            >
               Facebook Messenger
             </Text>
           </Text>
@@ -210,8 +252,8 @@ const styles = StyleSheet.create({
     flex: 0.5,
   },
   slide: {
-    width: width,
-    height: width * 1.1,
+    width: appInfo.sizes.WIDTH,
+    height: appInfo.sizes.WIDTH * 1.1,
     justifyContent: "flex-end",
     alignItems: "center",
   },
@@ -228,11 +270,11 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     padding: 30,
-    backgroundColor: "#fff",
+    backgroundColor: appColors.white,
     borderRadius: 5,
   },
   gradient: {
-    ...StyleSheet.absoluteFillObject, // Bao phủ toàn bộ slide
+    ...StyleSheet.absoluteFillObject,
   },
   title: {
     fontSize: 20,
@@ -242,26 +284,36 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: "#333",
+    color: appColors.gray,
     textAlign: "center",
   },
   formContainer: {
     width: "100%",
     paddingHorizontal: 16,
-    flex: 0.4, // Chiếm 30% màn hình
+    flex: 0.4,
   },
   formWrapper: {
     marginBottom: 16,
   },
-  input: {
-    height: 50,
-    borderColor: "#EE4D2D",
+  formGroup: {
+    position: "relative",
     borderWidth: 1,
     borderRadius: 5,
-    paddingHorizontal: 10,
-    marginBottom: 10,
-    backgroundColor: "#fff",
-    color: "#333",
+    marginBottom: 20,
+    height: 60,
+    borderColor: appColors.orange,
+    justifyContent: "center",
+    backgroundColor: appColors.white,
+  },
+  input: {
+    height: 40,
+    fontSize: 16,
+    paddingLeft: 40,
+  },
+  icon: {
+    position: "absolute",
+    left: 10,
+    top: 15,
   },
   metaWrapper: {
     paddingHorizontal: 16,
@@ -269,24 +321,24 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 16,
-    color: "#333",
+    color: appColors.gray,
     textAlign: "center",
   },
   linkText: {
-    color: "#1E90FF",
+    color: appColors.blue,
     textDecorationLine: "underline",
   },
   buttonContainer: {
     width: "100%",
   },
   button: {
-    backgroundColor: "#EE4D2D",
+    backgroundColor: appColors.orange,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 20,
   },
   buttonText: {
-    color: "#fff",
+    color: appColors.white,
     fontSize: 16,
     textAlign: "center",
   },

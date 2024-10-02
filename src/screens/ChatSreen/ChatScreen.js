@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import HeaderComponent from "../../components/HeaderComponent";
 import ChatComponent from "./components/ChatComponent";
+import { appColors } from "../../constants/appColors";
 
 const ChatScreen = () => {
   return (
@@ -19,7 +20,7 @@ const ChatScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: appColors.white,
   },
   chatWrapper: {
     flex: 1,

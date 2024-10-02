@@ -19,6 +19,7 @@ import EventSource from "react-native-sse";
 import Markdown from "react-native-markdown-display";
 import LoadingDots from "../../../components/LoadingDots";
 import moment from "moment";
+import { appColors } from "../../../constants/appColors";
 
 const CHAT_PHP_URL =
   "https://api.riokupon.com/vn/cozeai/assistant.php?action=chat";
@@ -503,18 +504,18 @@ const ChatComponent = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#e9eeff",
+    backgroundColor: appColors.blue1,
     flexDirection: "column",
   },
   live_chat: {
-    backgroundColor: "#0a7cff",
+    backgroundColor: appColors.blue,
     paddingVertical: 20,
     borderBottomLeftRadius: 48,
     borderBottomRightRadius: 48,
     alignItems: "center",
   },
   live_chat_text: {
-    color: "#fff",
+    color: appColors.white,
     textAlign: "center",
     marginBottom: 8,
   },
@@ -525,7 +526,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   live_chat_status: {
-    color: "#fff",
+    color: appColors.white,
     textAlign: "center",
   },
   agent_content: {
@@ -541,7 +542,7 @@ const styles = StyleSheet.create({
     maxWidth: "80%",
   },
   agent_message: {
-    backgroundColor: "#fff",
+    backgroundColor: appColors.white,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -549,7 +550,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   user_message: {
-    backgroundColor: "#0a7cff",
+    backgroundColor: appColors.blue,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -560,7 +561,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginVertical: 10,
     borderRadius: 16,
-    backgroundColor: "#fff",
+    backgroundColor: appColors.white,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -568,7 +569,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 5,
     paddingLeft: 8,
-    color: "#333",
+    color: appColors.gray,
     textAlign: "left",
     fontWeight: "700",
   },
@@ -576,7 +577,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 5,
     paddingRight: 8,
-    color: "#333",
+    color: appColors.gray,
     textAlign: "right",
     fontWeight: "700",
   },
@@ -586,7 +587,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderRadius: 15,
     marginTop: 10,
-    borderColor: "#fff",
+    borderColor: appColors.white,
     borderWidth: 2,
   },
   scrollView: {
@@ -598,9 +599,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: "#fff",
+    backgroundColor: appColors.white,
     borderTopWidth: 1,
-    borderTopColor: "#e9e9e9",
+    borderTopColor: appColors.gray1,
     alignItems: "center",
   },
   input: {
@@ -608,13 +609,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: appColors.gray2,
     borderRadius: 25,
     marginRight: 10,
   },
   sendButton: {
     fontSize: 28,
-    color: "#0a7cff",
+    color: appColors.blue,
   },
 });
 

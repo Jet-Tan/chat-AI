@@ -1,12 +1,17 @@
 import React from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import ChatScreen from "./src/screens/ChatSreen/ChatScreen";
-import LoginScreen from "./src/screens/AuthScreen/LoginScreen";
-
+import { Provider } from "react-redux";
+import store from "./src/redux/store";
+import { NavigationContainer } from "@react-navigation/native";
+import AppRouters from "./src/navigators/AppRouters";
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <LoginScreen />
-    </SafeAreaProvider>
+    <Provider store={store}>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <AppRouters />
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </Provider>
   );
 }
