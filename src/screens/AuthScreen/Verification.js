@@ -12,12 +12,15 @@ import {
 import { appColors } from "../../constants/appColors";
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
+import { addAuth } from "../../redux/reducers/authReducer";
+import { useDispatch } from "react-redux";
 const Verification = ({ route, navigation }) => {
   const { email, phone } = route.params;
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [count, setCount] = useState(60);
   const [isDisabled, setIsDisabled] = useState(false);
   const inputRefs = useRef([]);
+  const dispatch = useDispatch();
   useEffect(() => {
     const timer = setInterval(() => {
       setCount((prevCount) => {
@@ -52,7 +55,7 @@ const Verification = ({ route, navigation }) => {
       Alert.alert("Thông báo", "Vui lòng nhập đủ 6 ký tự OTP");
       return;
     }
-    const formData = new FormData();
+    const formData = new URLSearchParams();
     formData.append("tp", "account");
     formData.append("account_action", "loginUser");
     formData.append("login_type", "epv");
@@ -63,25 +66,27 @@ const Verification = ({ route, navigation }) => {
     try {
       const response = await axios.post(
         "https://account.riokupon.com/api/account.php",
-        formData,
+        formData.toString(),
         {
           headers: {
-            "Content-Type": "multipart/form-data",
+            "Content-Type": "application/x-www-form-urlencoded",
           },
         }
       );
+
       console.log("check", response);
       if (response.data.errors) {
         Alert.alert("Thông báo", response.data.errors.message);
       } else if (response.data.success) {
-        Alert.alert("Thông báo", response.data.success.message);
         const setCookieHeader = response.headers["set-cookie"];
         if (setCookieHeader) {
-          await SecureStore.setItemAsync(
-            "user_cookie",
-            JSON.stringify(setCookieHeader)
-          );
-          console.log("Cookie đã được lưu vào SecureStore:", setCookieHeader);
+          const usIdMatch = setCookieHeader.toString().match(/us_id=([^;]+);/);
+          const usIdValue = usIdMatch ? usIdMatch[1] : null;
+          dispatch(addAuth(usIdValue));
+          if (usIdValue) {
+            await SecureStore.setItemAsync("user_cookie", usIdValue);
+            console.log("Cookie đã được lưu vào SecureStore:", usIdValue);
+          }
         }
       }
     } catch (error) {

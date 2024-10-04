@@ -19,10 +19,16 @@ import { appInfo } from "../../constants/appInfos";
 import { FontAwesome } from "@expo/vector-icons";
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
+import { useDispatch, useSelector } from "react-redux";
+import { addAuth, authSelector } from "../../redux/reducers/authReducer";
+import LoadingOverlay from "../../components/LoadingOverlay";
 const VerificationFB = () => {
   const [userToken, setUserToken] = useState("");
   const [isClipboardChecked, setIsClipboardChecked] = useState(false);
   const navigation = useNavigation();
+  const dispatch = useDispatch();
+  const auth = useSelector(authSelector);
+  const [loading, setLoading] = useState(false);
   const openMessenger = () => {
     Linking.openURL("https://www.facebook.com/riokupon");
   };
@@ -45,11 +51,13 @@ const VerificationFB = () => {
   };
 
   const submitLogin = async (token) => {
+    setLoading(true);
     const formData = new FormData();
     formData.append("tp", "account");
     formData.append("account_action", "loginUser");
     formData.append("login_type", "token");
     formData.append("token", token);
+
     try {
       const response = await axios.post(
         "https://account.riokupon.com/api/account.php",
@@ -60,31 +68,34 @@ const VerificationFB = () => {
           },
         }
       );
-      console.log("check", response.headers);
+      setLoading(false);
       if (response.data.errors) {
         Alert.alert("Lỗi", response.data.errors.message);
       } else if (response.data.success) {
-        Alert.alert("Thành công", response.data.success.message);
         const setCookieHeader = response.headers["set-cookie"];
         if (setCookieHeader) {
-          await SecureStore.setItemAsync(
-            "user_cookie",
-            JSON.stringify(setCookieHeader)
-          );
-          console.log("Cookie đã được lưu vào SecureStore:", setCookieHeader);
+          const usIdMatch = setCookieHeader.toString().match(/us_id=([^;]+);/);
+          const usIdValue = usIdMatch ? usIdMatch[1] : null;
+          dispatch(addAuth(usIdValue));
+          if (usIdValue) {
+            await SecureStore.setItemAsync("user_cookie", usIdValue);
+            console.log("Cookie đã được lưu vào SecureStore:", usIdValue);
+          }
         }
       } else {
         throw new Error("Có lỗi xảy ra, vui lòng liên hệ Riokupon");
       }
     } catch (error) {
+      setLoading(false);
       console.error(error);
       Alert.alert("Lỗi", "Không thể xác thực mã đăng nhập");
     }
   };
   const clearUserCookie = async () => {
     try {
-      await SecureStore.deleteItemAsync("user_cookie");
-      console.log("Cookie đã được xóa khỏi SecureStore.");
+      const res = await SecureStore.deleteItemAsync("user_cookie");
+      res && dispatch(addAuth(res));
+      console.log("Cookie đã được xóa khỏi SecureStore.", res);
     } catch (error) {
       console.error("Lỗi khi xóa cookie:", error);
     }
@@ -129,8 +140,8 @@ const VerificationFB = () => {
               </TouchableOpacity>
             </View>
           </View>
-          <TouchableOpacity onPress={openLink}>
-            <Text style={[styles.linkText, { textAlign: "center" }]}>
+          <TouchableOpacity onPress={openLink} style={{ alignSelf: "center" }}>
+            <Text style={styles.linkText}>
               <FontAwesome name="facebook-f" size={16} color={appColors.blue} />{" "}
               hướng dẫn nhận mã tài khoản
             </Text>
@@ -158,6 +169,7 @@ const VerificationFB = () => {
             <Text style={styles.linkText}>chính sách bảo mật</Text> của Riokupon
           </Text>
         </View>
+        <LoadingOverlay visible={loading} />
       </View>
     </TouchableWithoutFeedback>
   );

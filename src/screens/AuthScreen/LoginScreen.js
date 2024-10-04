@@ -22,6 +22,7 @@ import { useNavigation } from "@react-navigation/native";
 import { appColors } from "../../constants/appColors";
 import { appInfo } from "../../constants/appInfos";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
+import LoadingOverlay from "../../components/LoadingOverlay";
 
 const LoginScreen = () => {
   const scrollViewRef = useRef(null);
@@ -93,8 +94,6 @@ const LoginScreen = () => {
         setLoading(false);
         if (data.errors) {
           if (data.errors.message === "register") {
-            navigation.navigate("RegisterScreen");
-            return;
           }
 
           Alert.alert("Thông báo", data.errors.message, [
@@ -229,6 +228,7 @@ const LoginScreen = () => {
             của Riokupon
           </Text>
         </View>
+        <LoadingOverlay visible={loading} />
       </KeyboardAvoidingView>
     </TouchableNativeFeedback>
   );

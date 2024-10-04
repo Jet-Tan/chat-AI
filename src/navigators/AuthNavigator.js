@@ -1,10 +1,10 @@
-import { View, Text } from "react-native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import LoginScreen from "../screens/AuthScreen/LoginScreen";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Verification from "../screens/AuthScreen/Verification";
 import VerificationFB from "../screens/AuthScreen/VerificationFB";
-import ChatScreen from "../screens/ChatSreen/ChatScreen";
+
+import IntroScreen from "../screens/AuthScreen/IntroScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -16,6 +16,7 @@ const AuthNavigator = () => {
       }}
     >
       <Stack.Screen name="LoginScreen" component={LoginScreen} />
+      <Stack.Screen name="IntroScreen" component={IntroScreen} />
       <Stack.Screen name="Verification" component={Verification} />
       <Stack.Screen name="VerificationFB" component={VerificationFB} />
     </Stack.Navigator>

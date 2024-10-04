@@ -1,22 +1,20 @@
 import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
-  id: "",
-  email: "",
-  phone: "",
-  accesstoken: "",
+  us_id: "",
 };
+
 const authSlice = createSlice({
   name: "auth",
-
-  initialState: {
-    authData: initialState,
-  },
+  initialState, // Cập nhật cấu trúc initialState đúng định dạng
   reducers: {
     addAuth: (state, action) => {
-      state.authData = action.payload;
+      console.log("data", action.payload);
+      state.us_id = action.payload;
     },
   },
 });
+
 export const authReducer = authSlice.reducer;
-export const authSelector = (state) => state.authReducer.authData;
+export const { addAuth } = authSlice.actions;
+export const authSelector = (state) => state.authReducer;
