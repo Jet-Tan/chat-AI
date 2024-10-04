@@ -9,7 +9,7 @@
     "splash": {
       "image": "./src/assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
+      "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true
@@ -17,11 +17,14 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/splash.png",
-        "backgroundColor": "#ffffff",
+        "backgroundColor": "#ffffff"
       }
     },
     "web": {
       "favicon": "./src/assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

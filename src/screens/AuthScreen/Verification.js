@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -10,60 +10,125 @@ import {
   Alert,
 } from "react-native";
 import { appColors } from "../../constants/appColors";
-
-const Verification = () => {
-  const [otp, setOtp] = useState(new Array(6).fill(""));
-  const [countdown, setCountdown] = useState(60);
+import axios from "axios";
+import * as SecureStore from "expo-secure-store";
+const Verification = ({ route, navigation }) => {
+  const { email, phone } = route.params;
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [count, setCount] = useState(60);
+  const [isDisabled, setIsDisabled] = useState(false);
   const inputRefs = useRef([]);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCount((prevCount) => {
+        if (prevCount <= 1) {
+          clearInterval(timer);
+          setIsDisabled(false);
+          return 0;
+        }
+        return prevCount - 1;
+      });
+    }, 1000);
 
-  const handleInputChange = (text, index) => {
-    let newOtp = [...otp];
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleOtpChange = (text, index) => {
+    const newOtp = [...otp];
     newOtp[index] = text;
     setOtp(newOtp);
 
-    if (text.length === 1 && index < 5) {
-      inputRefs.current[index + 1].focus();
+    // Chuyển focus tới ô tiếp theo nếu nhập đủ 1 ký tự
+    if (text.length === 1 && index < otp.length - 1) {
+      setTimeout(() => {
+        inputRefs.current[index + 1]?.focus();
+      }, 100);
     }
   };
 
-  const handleResendOTP = () => {
-    if (countdown > 0) return;
-    Alert.alert(
-      "Gửi lại OTP",
-      "Mã OTP mới đã được gửi đến điện thoại của bạn."
-    );
-    setCountdown(60);
-  };
+  const handleSubmit = async () => {
+    const otpValue = otp.join("");
+    if (otpValue.length !== 6) {
+      Alert.alert("Thông báo", "Vui lòng nhập đủ 6 ký tự OTP");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("tp", "account");
+    formData.append("account_action", "loginUser");
+    formData.append("login_type", "epv");
+    formData.append("email", email || ""); // Nếu email null thì gửi chuỗi rỗng
+    formData.append("phone", phone || ""); // Nếu phone null thì gửi chuỗi rỗng
+    formData.append("otp", otpValue);
 
-  const handleVerifyOTP = () => {
-    let enteredOtp = otp.join("");
-    if (enteredOtp.length < 6) {
-      Alert.alert("Lỗi", "Vui lòng nhập đủ 6 ký tự OTP.");
-    } else {
-      Alert.alert("Xác minh", "Mã OTP của bạn là: " + enteredOtp);
+    try {
+      const response = await axios.post(
+        "https://account.riokupon.com/api/account.php",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      console.log("check", response);
+      if (response.data.errors) {
+        Alert.alert("Thông báo", response.data.errors.message);
+      } else if (response.data.success) {
+        Alert.alert("Thông báo", response.data.success.message);
+        const setCookieHeader = response.headers["set-cookie"];
+        if (setCookieHeader) {
+          await SecureStore.setItemAsync(
+            "user_cookie",
+            JSON.stringify(setCookieHeader)
+          );
+          console.log("Cookie đã được lưu vào SecureStore:", setCookieHeader);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Thông báo", "Đã có lỗi xảy ra. Vui lòng thử lại.");
     }
   };
 
+  const resendOtp = async () => {
+    setIsDisabled(true);
+    try {
+      const response = await axios.post(
+        "https://account.riokupon.com/api/account.php",
+        {
+          tp: "account",
+          account_action: "loginUser",
+          login_type: "ep",
+          email: email || undefined,
+          phone: phone || undefined,
+        }
+      );
+
+      if (response.data.errors) {
+        Alert.alert("Thông báo", response.data.errors.message);
+      } else if (response.data.success) {
+        Alert.alert("Thông báo", "Mã OTP đã được gửi lại!");
+        setCount(60); // Reset lại thời gian đếm
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Thông báo", "Đã có lỗi xảy ra. Vui lòng thử lại.");
+    }
+  };
   const handleClearOTP = () => {
     setOtp(new Array(6).fill(""));
     inputRefs.current[0].focus();
   };
 
-  React.useEffect(() => {
-    if (countdown === 0) return;
-    const timer = setInterval(() => {
-      setCountdown((prevCount) => prevCount - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [countdown]);
-
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>
-        <Text style={styles.title}>Xác minh số điện thoại (Zalo)</Text>
+        <Text style={styles.title}>
+          Xác minh {phone ? "Số điện thoại (Zalo)" : "Email"}
+        </Text>
         <Text style={styles.description}>
           Nhập mã OTP được gửi đến{" "}
-          <Text style={styles.highlight}>+84 123456789</Text>
+          <Text style={styles.highlight}>{phone ? phone : email}</Text>
         </Text>
 
         <View style={styles.otpContainer}>
@@ -72,10 +137,10 @@ const Verification = () => {
               key={index}
               style={styles.otpInput}
               value={value}
-              onChangeText={(text) => handleInputChange(text, index)}
+              onChangeText={(text) => handleOtpChange(text, index)}
               keyboardType="number-pad"
               maxLength={1}
-              ref={(ref) => (inputRefs.current[index] = ref)}
+              ref={(el) => (inputRefs.current[index] = el)}
               placeholder="-"
             />
           ))}
@@ -84,17 +149,18 @@ const Verification = () => {
             <Text style={styles.clearText}>Xóa</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.verifyButton} onPress={handleVerifyOTP}>
+        <TouchableOpacity style={styles.verifyButton} onPress={handleSubmit}>
           <Text style={styles.verifyText}>Xác minh & Đăng nhập</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleResendOTP} disabled={countdown > 0}>
-          <Text style={styles.resendText}>
-            Không nhận được OTP?{" "}
+
+        <Text style={styles.resendText}>
+          Không nhận được OTP?{" "}
+          <TouchableOpacity onPress={resendOtp} disabled={count > 0}>
             <Text style={styles.resendLink}>
-              {countdown > 0 ? `Chờ ${countdown} giây` : "Gửi lại OTP"}
+              {count > 0 ? `Chờ ${count} giây` : "Gửi lại OTP"}
             </Text>
-          </Text>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </Text>
       </View>
     </TouchableWithoutFeedback>
   );

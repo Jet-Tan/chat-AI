@@ -10,55 +10,92 @@ import {
   TouchableWithoutFeedback,
   Pressable,
   Keyboard,
+  Image,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import * as Clipboard from "expo-clipboard"; // Thay thế Clipboard từ react-native
+import * as Clipboard from "expo-clipboard";
 import { appColors } from "../../constants/appColors";
 import { appInfo } from "../../constants/appInfos";
-
+import { FontAwesome } from "@expo/vector-icons";
+import axios from "axios";
+import * as SecureStore from "expo-secure-store";
 const VerificationFB = () => {
-  const [token, setToken] = useState("");
+  const [userToken, setUserToken] = useState("");
+  const [isClipboardChecked, setIsClipboardChecked] = useState(false);
   const navigation = useNavigation();
   const openMessenger = () => {
-    // Liên kết đến trang Messenger của Facebook
-    const messengerUrl = "https://www.facebook.com/riokupon"; // URL đến Messenger
-
-    Linking.canOpenURL(messengerUrl)
-      .then((supported) => {
-        if (supported) {
-          Linking.openURL(messengerUrl);
-        } else {
-          Alert.alert("Không thể mở Messenger", "Vui lòng kiểm tra lại URL.");
-        }
-      })
-      .catch((err) => console.error("Đã xảy ra lỗi", err));
+    Linking.openURL("https://www.facebook.com/riokupon");
   };
-
-  const readClipboard = async () => {
-    const clipboardContent = await Clipboard.getStringAsync();
-    if (clipboardContent && clipboardContent.length >= 30) {
-      setToken(clipboardContent);
-      handleLogin(clipboardContent);
-    } else {
-      Alert.alert("Thông báo", "Nội dung trong clipboard không hợp lệ.");
+  const openLink = () => {
+    Linking.openURL(
+      "https://riokupon.com/vn/blog/cach-dang-nhap-dang-ky-account-riokupon-bang-tai-khoan-facebook/2567"
+    );
+  };
+  const checkClipboard = async () => {
+    try {
+      const pastedData = await Clipboard.getStringAsync();
+      if (pastedData && pastedData.length >= 30) {
+        setUserToken(pastedData);
+        setIsClipboardChecked(true);
+        submitLogin(pastedData);
+      }
+    } catch (error) {
+      console.error("Lỗi khi đọc clipboard:", error);
     }
   };
 
-  // Hàm xử lý đăng nhập
-  const handleLogin = (inputToken) => {
-    if (inputToken.length >= 30) {
-      Alert.alert("Đăng nhập thành công", `Token: ${inputToken}`);
-    } else {
-      Alert.alert("Lỗi", "Mã đăng nhập không hợp lệ. Vui lòng thử lại.");
+  const submitLogin = async (token) => {
+    const formData = new FormData();
+    formData.append("tp", "account");
+    formData.append("account_action", "loginUser");
+    formData.append("login_type", "token");
+    formData.append("token", token);
+    try {
+      const response = await axios.post(
+        "https://account.riokupon.com/api/account.php",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      console.log("check", response.headers);
+      if (response.data.errors) {
+        Alert.alert("Lỗi", response.data.errors.message);
+      } else if (response.data.success) {
+        Alert.alert("Thành công", response.data.success.message);
+        const setCookieHeader = response.headers["set-cookie"];
+        if (setCookieHeader) {
+          await SecureStore.setItemAsync(
+            "user_cookie",
+            JSON.stringify(setCookieHeader)
+          );
+          console.log("Cookie đã được lưu vào SecureStore:", setCookieHeader);
+        }
+      } else {
+        throw new Error("Có lỗi xảy ra, vui lòng liên hệ Riokupon");
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Lỗi", "Không thể xác thực mã đăng nhập");
+    }
+  };
+  const clearUserCookie = async () => {
+    try {
+      await SecureStore.deleteItemAsync("user_cookie");
+      console.log("Cookie đã được xóa khỏi SecureStore.");
+    } catch (error) {
+      console.error("Lỗi khi xóa cookie:", error);
     }
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.container}>
         <View style={styles.loginBox}>
           <Text style={styles.title}>Đăng nhập tài khoản Riokupon</Text>
-          <Text style={styles.termsText}>
+          <Text style={{ fontSize: 16 }}>
             Sử dụng tài khoản Facebook/Messenger để đăng nhập
           </Text>
           <Text style={styles.termsText}>
@@ -68,30 +105,38 @@ const VerificationFB = () => {
             </Text>{" "}
             để nhận mã tài khoản
           </Text>
-
+          <TouchableOpacity onPress={clearUserCookie}>
+            <Text>xoá</Text>
+          </TouchableOpacity>
           <View style={styles.inputContainer}>
             <Text>Mã tài khoản:</Text>
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
-                value={token}
-                onChangeText={setToken}
+                value={userToken}
+                onChangeText={setUserToken}
                 placeholder="Nhập mã đăng nhập tại đây"
                 secureTextEntry={true}
+                disabled={!userToken}
               />
               <TouchableOpacity
-                onPress={readClipboard}
+                onPress={checkClipboard}
                 style={styles.pasteButton}
               >
-                <Text style={{ color: "blue" }}>Dán</Text>
+                <Text>
+                  Dán <FontAwesome name="clipboard" size={14} />
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
-          <TouchableOpacity>
-            <Text style={styles.linkText}>hướng dẫn nhận mã tài khoản</Text>
+          <TouchableOpacity onPress={openLink}>
+            <Text style={[styles.linkText, { textAlign: "center" }]}>
+              <FontAwesome name="facebook-f" size={16} color={appColors.blue} />{" "}
+              hướng dẫn nhận mã tài khoản
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => handleLogin(token)}
+            onPress={() => submitLogin(userToken)}
             style={styles.buttonLogin}
           >
             <Text style={styles.buttonText}>Đăng nhập</Text>
@@ -127,7 +172,7 @@ const styles = StyleSheet.create({
   },
   loginBox: {
     width: appInfo.sizes.WIDTH,
-    backgroundColor: "white",
+    backgroundColor: appColors.white,
     padding: 20,
   },
   title: {
@@ -142,8 +187,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     borderColor: appColors.gray1,
     borderWidth: 1,
-    borderRadius: 5,
     alignItems: "center",
+    marginVertical: 10,
+    paddingVertical: 5,
   },
   input: {
     flex: 1,
@@ -151,16 +197,18 @@ const styles = StyleSheet.create({
   },
   pasteButton: {
     padding: 10,
+    backgroundColor: appColors.gray2,
+    marginRight: 5,
   },
   buttonLogin: {
-    backgroundColor: appColors.blue,
+    backgroundColor: appColors.yellow,
     padding: 12,
     borderRadius: 5,
     alignItems: "center",
     marginTop: 20,
   },
   buttonText: {
-    color: "white",
+    color: appColors.white,
     fontSize: 16,
   },
   altLoginText: {
@@ -169,7 +217,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   linkText: {
-    color: "blue",
+    color: appColors.blue,
   },
   termsText: {
     marginTop: 10,

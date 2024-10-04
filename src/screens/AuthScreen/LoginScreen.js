@@ -22,8 +22,7 @@ import { useNavigation } from "@react-navigation/native";
 import { appColors } from "../../constants/appColors";
 import { appInfo } from "../../constants/appInfos";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
-import firebase from "firebase/compat/app";
-import "firebase/compat/auth";
+
 const LoginScreen = () => {
   const scrollViewRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -37,7 +36,6 @@ const LoginScreen = () => {
     require("../../assets/images/slide3.png"),
   ];
 
-  // Function to auto-scroll to the next slide
   const autoScroll = () => {
     const nextIndex = (currentIndex + 1) % slides.length;
     setCurrentIndex(nextIndex);
@@ -52,7 +50,6 @@ const LoginScreen = () => {
     return () => clearInterval(interval); // Cleanup interval on unmount
   }, [currentIndex]);
 
-  // Xử lý khi nhấn vào nút "Bắt Đầu"
   const handleLogin = () => {
     const regexEmail = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
     const regexPhone = /^\d{10,}$/;
@@ -92,11 +89,6 @@ const LoginScreen = () => {
         }
       )
       .then((response) => {
-        console.log("Full response:", response);
-        console.log("Status:", response.status);
-        console.log("Headers:", response.headers);
-        console.log("Data:", response.data);
-
         const data = response.data;
         setLoading(false);
         if (data.errors) {
@@ -109,7 +101,7 @@ const LoginScreen = () => {
             {
               text: "Đăng nhập bằng Facebook",
               onPress: () => {
-                // Thêm logic đăng nhập bằng Facebook tại đây nếu có
+                navigation.navigate("VerificationFB");
               },
             },
             { text: "Đóng", style: "cancel" },
@@ -326,7 +318,6 @@ const styles = StyleSheet.create({
   },
   linkText: {
     color: appColors.blue,
-    textDecorationLine: "underline",
   },
   buttonContainer: {
     width: "100%",
