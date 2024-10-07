@@ -73,11 +73,14 @@ const Verification = ({ route, navigation }) => {
           },
         }
       );
-
-      console.log("check", response);
       if (response.data.errors) {
-        Alert.alert("Thông báo", response.data.errors.message);
+        showToast("error", "Thông báo", response.data.errors.message);
       } else if (response.data.success) {
+        showToast(
+          "success",
+          "Đăng nhập thành công!",
+          "Bạn đã đăng nhập vào tài khoản Riokupon."
+        );
         const setCookieHeader = response.headers["set-cookie"];
         if (setCookieHeader) {
           const usIdMatch = setCookieHeader.toString().match(/us_id=([^;]+);/);
@@ -91,7 +94,7 @@ const Verification = ({ route, navigation }) => {
       }
     } catch (error) {
       console.error(error);
-      Alert.alert("Thông báo", "Đã có lỗi xảy ra. Vui lòng thử lại.");
+      showToast("error", "Thông báo", "Đã có lỗi xảy ra. Vui lòng thử lại.");
     }
   };
 

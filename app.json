@@ -4,6 +4,7 @@
     "slug": "chat-ai",
     "version": "1.0.0",
     "orientation": "portrait",
+     "scheme": "chat-ai",
     "icon": "./src/assets/images/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
@@ -15,6 +16,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.riokupon.chatai",
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/splash.png",
         "backgroundColor": "#ffffff"

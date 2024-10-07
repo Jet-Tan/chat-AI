@@ -22,6 +22,8 @@ import * as SecureStore from "expo-secure-store";
 import { useDispatch, useSelector } from "react-redux";
 import { addAuth, authSelector } from "../../redux/reducers/authReducer";
 import LoadingOverlay from "../../components/LoadingOverlay";
+import { showToast } from "../../components/CustomToast";
+import GoogleSignInComponent from "./components/GoogleSignInComponent";
 const VerificationFB = () => {
   const [userToken, setUserToken] = useState("");
   const [isClipboardChecked, setIsClipboardChecked] = useState(false);
@@ -70,8 +72,13 @@ const VerificationFB = () => {
       );
       setLoading(false);
       if (response.data.errors) {
-        Alert.alert("Lỗi", response.data.errors.message);
+        showToast("error", "Thông báo", response.data.errors.message);
       } else if (response.data.success) {
+        showToast(
+          "success",
+          "Đăng nhập thành công!",
+          "Bạn đã đăng nhập vào tài khoản Riokupon."
+        );
         const setCookieHeader = response.headers["set-cookie"];
         if (setCookieHeader) {
           const usIdMatch = setCookieHeader.toString().match(/us_id=([^;]+);/);
@@ -79,7 +86,6 @@ const VerificationFB = () => {
           dispatch(addAuth(usIdValue));
           if (usIdValue) {
             await SecureStore.setItemAsync("user_cookie", usIdValue);
-            console.log("Cookie đã được lưu vào SecureStore:", usIdValue);
           }
         }
       } else {
@@ -88,7 +94,7 @@ const VerificationFB = () => {
     } catch (error) {
       setLoading(false);
       console.error(error);
-      Alert.alert("Lỗi", "Không thể xác thực mã đăng nhập");
+      showToast("error", "Thông báo", "Không thể xác thực mã đăng nhập");
     }
   };
   const clearUserCookie = async () => {
@@ -152,6 +158,14 @@ const VerificationFB = () => {
           >
             <Text style={styles.buttonText}>Đăng nhập</Text>
           </TouchableOpacity>
+          <View
+            style={{
+              flex: 1,
+              marginVertical: 30,
+            }}
+          >
+            <GoogleSignInComponent />
+          </View>
 
           <Text style={styles.altLoginText}>
             Đăng nhập bằng{" "}
@@ -224,7 +238,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   altLoginText: {
-    marginTop: 20,
     textAlign: "center",
     fontSize: 16,
   },

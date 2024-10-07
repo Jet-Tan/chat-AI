@@ -13,6 +13,12 @@ const AuthNavigator = () => {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
+        animationEnabled: true,
+        gestureEnabled: true,
+        transitionSpec: {
+          open: { animation: "timing", config: { duration: 300 } },
+          close: { animation: "timing", config: { duration: 300 } },
+        },
       }}
     >
       <Stack.Screen name="LoginScreen" component={LoginScreen} />
