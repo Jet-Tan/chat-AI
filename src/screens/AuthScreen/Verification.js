@@ -14,11 +14,14 @@ import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 import { addAuth } from "../../redux/reducers/authReducer";
 import { useDispatch } from "react-redux";
+import LoadingOverlay from "../../components/LoadingOverlay";
+import { showToast } from "../../components/CustomToast";
 const Verification = ({ route, navigation }) => {
   const { email, phone } = route.params;
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [count, setCount] = useState(60);
   const [isDisabled, setIsDisabled] = useState(false);
+  const [loading, setLoading] = useState(false);
   const inputRefs = useRef([]);
   const dispatch = useDispatch();
   useEffect(() => {
@@ -50,6 +53,7 @@ const Verification = ({ route, navigation }) => {
   };
 
   const handleSubmit = async () => {
+    setLoading(true);
     const otpValue = otp.join("");
     if (otpValue.length !== 6) {
       Alert.alert("Thông báo", "Vui lòng nhập đủ 6 ký tự OTP");
@@ -73,6 +77,7 @@ const Verification = ({ route, navigation }) => {
           },
         }
       );
+      setLoading(false);
       if (response.data.errors) {
         showToast("error", "Thông báo", response.data.errors.message);
       } else if (response.data.success) {
@@ -93,34 +98,54 @@ const Verification = ({ route, navigation }) => {
         }
       }
     } catch (error) {
+      setLoading(false);
       console.error(error);
       showToast("error", "Thông báo", "Đã có lỗi xảy ra. Vui lòng thử lại.");
     }
   };
 
+  useEffect(() => {
+    let timer;
+    if (count > 0) {
+      timer = setInterval(() => {
+        setCount((prevCount) => prevCount - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [count]);
+
   const resendOtp = async () => {
+    setLoading(true);
     setIsDisabled(true);
     try {
+      const formData = new URLSearchParams();
+      formData.append("tp", "account");
+      formData.append("account_action", "loginUser");
+      formData.append("login_type", "ep");
+      formData.append("email", email || undefined);
+      formData.append("phone", phone || undefined);
       const response = await axios.post(
         "https://account.riokupon.com/api/account.php",
+        formData.toString(),
         {
-          tp: "account",
-          account_action: "loginUser",
-          login_type: "ep",
-          email: email || undefined,
-          phone: phone || undefined,
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
         }
       );
 
       if (response.data.errors) {
         Alert.alert("Thông báo", response.data.errors.message);
+        setIsDisabled(false);
       } else if (response.data.success) {
+        setLoading(false);
         Alert.alert("Thông báo", "Mã OTP đã được gửi lại!");
-        setCount(60); // Reset lại thời gian đếm
+        setCount(60); // Bắt đầu đếm lại từ 60 giây
       }
     } catch (error) {
       console.error(error);
       Alert.alert("Thông báo", "Đã có lỗi xảy ra. Vui lòng thử lại.");
+      setIsDisabled(false);
     }
   };
   const handleClearOTP = () => {
@@ -169,6 +194,7 @@ const Verification = ({ route, navigation }) => {
             </Text>
           </TouchableOpacity>
         </Text>
+        <LoadingOverlay visible={loading} />
       </View>
     </TouchableWithoutFeedback>
   );

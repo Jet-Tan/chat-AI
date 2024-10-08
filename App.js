@@ -5,14 +5,16 @@ import store from "./src/redux/store";
 import { NavigationContainer } from "@react-navigation/native";
 import AppRouters from "./src/navigators/AppRouters";
 import CustomToast from "./src/components/CustomToast";
-import TermsOfUse from "./src/screens/TermScreen/TermsOfUse";
+import { StatusBar } from "react-native";
+import { appColors } from "./src/constants/appColors";
 
 export default function App() {
   return (
     <Provider store={store}>
       <SafeAreaProvider>
+        <StatusBar backgroundColor={appColors.white} barStyle="dark-content" />
         <NavigationContainer>
-          <TermsOfUse />
+          <AppRouters />
           <CustomToast />
         </NavigationContainer>
       </SafeAreaProvider>

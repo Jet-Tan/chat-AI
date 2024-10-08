@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Linking } from "react-native"; // Để sử dụng Linking cho các liên kết
-import Footer from "./FooterComponent";
+import Footer from "./components/FooterComponent";
 
 const TermsOfUse = () => {
   return (
@@ -317,9 +317,44 @@ const TermsOfUse = () => {
             liên quan. Riokupon bảo lưu quyền sửa đổi Thỏa Thuận này bất cứ lúc
             nào.
           </Text>
+          <Text
+            style={[
+              styles.paragraph,
+              { fontStyle: "italic", fontWeight: "bold" },
+            ]}
+          >
+            Cập nhật ngày 16/4/2024
+          </Text>
+          <Text
+            style={[
+              styles.paragraph,
+              { fontStyle: "italic", fontWeight: "bold" },
+            ]}
+          >
+            Thông tin liên hệ:
+          </Text>
+          <Text style={styles.paragraph}>
+            Doanh nghiệp: Công ty TNHH Thiết kế và Quản lý Quảng cáo Dimaco
+          </Text>
+          <Text style={styles.paragraph}>
+            Địa chỉ: Số 18/4 Trần Văn Hoàng, Phường 9, Quận Tân Bình, Thành phố
+            Hồ Chí Minh, Việt Nam
+          </Text>
+          <Text style={styles.paragraph}>SĐT: 0819.577.577</Text>
+          <Text style={styles.paragraph}>Email: hotro@riokupon.com</Text>
+          <Text style={styles.paragraph}>
+            Trường hợp bạn cần hỗ trợ thêm các vấn đề khi sử dụng Riokupon, vui
+            lòng liên hệ{" "}
+            <Text
+              style={styles.link}
+              onPress={() => Linking.openURL("https://m.me/riokupon")}
+            >
+              TẠI ĐÂY
+            </Text>
+          </Text>
         </View>
+        <Footer />
       </ScrollView>
-      <Footer />
     </View>
   );
 };
@@ -343,10 +378,9 @@ const styles = StyleSheet.create({
     width: "auto",
   },
   title: {
-    fontSize: 24,
+    fontSize: 30,
     fontWeight: "bold",
     textAlign: "center",
-    marginVertical: 16,
   },
   sectionTitle: {
     fontSize: 18,
@@ -356,6 +390,10 @@ const styles = StyleSheet.create({
   paragraph: {
     fontSize: 16,
     marginBottom: 8,
+  },
+  link: {
+    fontWeight: "bold",
+    color: "blue",
   },
 });
 

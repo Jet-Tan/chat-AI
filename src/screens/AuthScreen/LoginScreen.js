@@ -24,7 +24,8 @@ import { appInfo } from "../../constants/appInfos";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import GoogleSignInComponent from "./components/GoogleSignInComponent";
-
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { showToast } from "../../components/CustomToast";
 const LoginScreen = () => {
   const scrollViewRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -71,7 +72,6 @@ const LoginScreen = () => {
     }
 
     setLoading(true);
-
     const formData = new URLSearchParams();
     formData.append("tp", "account");
     formData.append("account_action", "loginUser");
@@ -92,38 +92,35 @@ const LoginScreen = () => {
       .then((response) => {
         const data = response.data;
         setLoading(false);
+
         if (data.errors) {
           if (data.errors.message === "register") {
-            handleRegister();
-          }
-
-          Alert.alert("Thông báo", data.errors.message, [
-            {
-              text: "Đăng nhập bằng Facebook",
-              onPress: () => {
-                navigation.navigate("VerificationFB");
-              },
-            },
-            { text: "Đóng", style: "cancel" },
-          ]);
-          return;
-        }
-        if (data.success) {
-          if (phone) {
-            navigation.navigate("Verification", { phone });
+            // Chuyển qua hàm đăng ký mà không set loading nữa
+            handleRegister(false); // Truyền vào một biến để hàm handleRegister biết không set loading
           } else {
-            navigation.navigate("Verification", { email });
+            Alert.alert("Thông báo", data.errors.message, [
+              {
+                text: "Đăng nhập bằng Facebook",
+                onPress: () => navigation.navigate("VerificationFB"),
+              },
+              { text: "Đóng", style: "cancel" },
+            ]);
+            return;
           }
+        } else if (data.success) {
+          navigation.navigate("Verification", phone ? { phone } : { email });
         }
       })
-      .catch((error) => {
+      .catch(() => {
         setLoading(false);
         Alert.alert("Thông báo", "Đã xảy ra lỗi, vui lòng thử lại.", [
           { text: "Đóng" },
         ]);
       });
   };
-  const handleRegister = async () => {
+
+  // Thay đổi hàm `handleRegister`
+  const handleRegister = async (shouldSetLoading = true) => {
     let email = "",
       phone = "";
     if (regexEmail.test(userInput)) {
@@ -131,47 +128,52 @@ const LoginScreen = () => {
     } else if (regexPhone.test(userInput)) {
       phone = userInput;
     } else {
-      showAlert("Vui lòng nhập vào email hoặc số điện thoại hợp lệ");
+      Alert.alert("Vui lòng nhập vào email hoặc số điện thoại hợp lệ");
       return;
     }
 
-    setLoading(true);
+    // Chỉ set loading nếu được phép
+    if (shouldSetLoading) setLoading(true);
+
     const formData = new URLSearchParams();
     formData.append("tp", "account");
-    formData.append("account_action", "loginUser");
-    formData.append("login_type", "ep");
+    formData.append("account_action", "registerUser");
+    formData.append("register_type", "ep");
     formData.append("email", email);
     formData.append("phone", phone);
+
     try {
       const response = await axios.post(
         "https://account.riokupon.com/api/account.php",
+        formData.toString(),
         {
-          tp: "account",
-          account_action: "registerUser",
-          register_type: "ep",
-          email,
-          phone,
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
         }
       );
-
       const data = response.data;
-      setLoading(false);
-
       if (data.errors) {
-        showAlert(data.errors.message);
+        showToast("error", "Thông báo", data.errors.message);
       } else if (data.success) {
-        await clearCache();
-        showAlert(data.success.message);
+        showToast("error", "Thông báo", data.success.message);
+
+        // Delay 1 giây trước khi điều hướng
         setTimeout(() => {
-          // Chuyển đến trang giới thiệu sau khi đăng ký thành công
-          // Ví dụ: navigation.navigate('IntroScreen');
-        }, 1000);
+          navigation.navigate("IntroScreen");
+          // Ngừng loading sau khi đã điều hướng
+          setLoading(false);
+        }, 1000); // 1000 ms = 1 giây
       }
     } catch (error) {
       console.error("Lỗi đăng ký:", error);
-      setLoading(false);
+      showToast("error", "Thông báo", "Đã xảy ra lỗi, vui lòng thử lại.");
+    } finally {
+      // Đảm bảo ngừng loading nếu có lỗi
+      if (shouldSetLoading) setLoading(false);
     }
   };
+
   return (
     <TouchableNativeFeedback onPress={Keyboard.dismiss}>
       <View
