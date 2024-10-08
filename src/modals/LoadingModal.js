@@ -2,7 +2,7 @@ import React from "react";
 import { View, Modal, ActivityIndicator, StyleSheet } from "react-native";
 import { appColors } from "../constants/appColors";
 
-const LoadingOverlay = ({ visible }) => {
+const LoadingModal = ({ visible }) => {
   return (
     <Modal
       transparent={true}
@@ -32,4 +32,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LoadingOverlay;
+export default LoadingModal;

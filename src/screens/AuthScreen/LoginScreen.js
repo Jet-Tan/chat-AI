@@ -22,10 +22,10 @@ import { useNavigation } from "@react-navigation/native";
 import { appColors } from "../../constants/appColors";
 import { appInfo } from "../../constants/appInfos";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
-import LoadingOverlay from "../../components/LoadingOverlay";
 import GoogleSignInComponent from "./components/GoogleSignInComponent";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { showToast } from "../../components/CustomToast";
+import LoadingModal from "../../modals/LoadingModal";
 const LoginScreen = () => {
   const scrollViewRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -266,7 +266,7 @@ const LoginScreen = () => {
             </View>
           </View>
 
-          <LoadingOverlay visible={loading} />
+          <LoadingModal visible={loading} />
         </KeyboardAvoidingView>
         <View style={styles.metaWrapper}>
           <Text style={styles.metaText}>

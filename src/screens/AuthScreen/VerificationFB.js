@@ -21,9 +21,9 @@ import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 import { useDispatch, useSelector } from "react-redux";
 import { addAuth, authSelector } from "../../redux/reducers/authReducer";
-import LoadingOverlay from "../../components/LoadingOverlay";
 import { showToast } from "../../components/CustomToast";
 import GoogleSignInComponent from "./components/GoogleSignInComponent";
+import LoadingModal from "../../modals/LoadingModal";
 const VerificationFB = () => {
   const [userToken, setUserToken] = useState("");
   const [isClipboardChecked, setIsClipboardChecked] = useState(false);
@@ -183,7 +183,7 @@ const VerificationFB = () => {
             <Text style={styles.linkText}>chính sách bảo mật</Text> của Riokupon
           </Text>
         </View>
-        <LoadingOverlay visible={loading} />
+        <LoadingModal visible={loading} />
       </View>
     </TouchableWithoutFeedback>
   );

@@ -14,8 +14,9 @@ import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 import { addAuth } from "../../redux/reducers/authReducer";
 import { useDispatch } from "react-redux";
-import LoadingOverlay from "../../components/LoadingOverlay";
+
 import { showToast } from "../../components/CustomToast";
+import LoadingModal from "../../modals/LoadingModal";
 const Verification = ({ route, navigation }) => {
   const { email, phone } = route.params;
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -194,7 +195,7 @@ const Verification = ({ route, navigation }) => {
             </Text>
           </TouchableOpacity>
         </Text>
-        <LoadingOverlay visible={loading} />
+        <LoadingModal visible={loading} />
       </View>
     </TouchableWithoutFeedback>
   );
