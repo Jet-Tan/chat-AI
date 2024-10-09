@@ -6,6 +6,7 @@ import ChatNavigator from "./ChatNavigator";
 import * as SecureStore from "expo-secure-store";
 import LoadingIndicator from "../components/LoadingIndicator";
 import { addAuth, authSelector } from "../redux/reducers/authReducer";
+import MainNavigator from "./MainNavigator";
 
 const AppRouters = () => {
   const [loading, setLoading] = useState(true);
@@ -42,6 +43,6 @@ const AppRouters = () => {
     return <LoadingIndicator />;
   }
 
-  return <>{!auth.us_id ? <ChatNavigator /> : <AuthNavigator />}</>;
+  return <>{auth.us_id ? <MainNavigator /> : <AuthNavigator />}</>;
 };
 export default AppRouters;

@@ -4,34 +4,39 @@ import { StyleSheet, View, Image, TouchableOpacity } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { appColors } from "../constants/appColors";
 import { useNavigation } from "@react-navigation/native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 const HeaderComponent = ({ openDrawer }) => {
   const navigation = useNavigation();
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.navigate("HomeScreen")}>
-        <Image
-          source={require("../assets/images/logo.png")}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
+    <SafeAreaProvider>
+      <SafeAreaView style={{ flex: 1, backgroundColor: appColors.white }}>
+        <View style={styles.container}>
+          <TouchableOpacity onPress={() => navigation.navigate("HomeScreen")}>
+            <Image
+              source={require("../assets/images/logo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.menuButton}
-        accessibilityLabel="Menu"
-        onPress={openDrawer}
-      >
-        <FontAwesome5 name="bars" size={18} color={appColors.gray} />
-      </TouchableOpacity>
-    </View>
+          <TouchableOpacity
+            style={styles.menuButton}
+            accessibilityLabel="Menu"
+            onPress={openDrawer}
+          >
+            <FontAwesome5 name="bars" size={14} color={appColors.gray} />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     position: "relative",
-    height: 50,
+    height: 60,
     width: "100%",
     backgroundColor: appColors.white,
     borderBottomWidth: 1,
