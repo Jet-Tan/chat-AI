@@ -8,19 +8,19 @@ import { appColors } from "../../constants/appColors";
 
 const ChatScreen = () => {
   return (
-    <View style={styles.container}>
+    <>
       <HeaderComponent />
       <View style={styles.chatWrapper}>
         <ChatComponent />
       </View>
-    </View>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: appColors.white,
+    backgroundColor: appColors.orange,
   },
   chatWrapper: {
     flex: 1,
