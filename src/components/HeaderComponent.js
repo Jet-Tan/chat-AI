@@ -3,15 +3,19 @@ import React from "react";
 import { StyleSheet, View, Image, TouchableOpacity } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { appColors } from "../constants/appColors";
+import { useNavigation } from "@react-navigation/native";
 
 const HeaderComponent = ({ openDrawer }) => {
+  const navigation = useNavigation();
   return (
     <View style={styles.container}>
-      <Image
-        source={require("../assets/images/logo.png")}
-        style={styles.logo}
-        resizeMode="contain"
-      />
+      <TouchableOpacity onPress={() => navigation.navigate("HomeScreen")}>
+        <Image
+          source={require("../assets/images/logo.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.menuButton}
@@ -39,14 +43,15 @@ const styles = StyleSheet.create({
   },
   logo: {
     height: 40,
-    width: 100,
+    width: 120,
   },
   menuButton: {
     padding: 10,
     marginLeft: "auto",
     borderRadius: 20,
     borderColor: appColors.gray1,
-    borderWidth: 1,
+    borderWidth: 2,
+    // borderRadius: "50%",
   },
 });
 
