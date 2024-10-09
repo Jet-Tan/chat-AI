@@ -31,7 +31,9 @@ const HeaderComponent = ({ openDrawer }) => {
           accessibilityLabel="Menu"
           onPress={openDrawer}
         >
-          <FontAwesome5 name="bars" size={14} color={appColors.gray} />
+          <View style={styles.circle}>
+            <FontAwesome5 name="bars" size={18} color={appColors.gray} />
+          </View>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -49,10 +51,15 @@ const styles = StyleSheet.create({
     width: 120,
   },
   menuButton: {
-    padding: 10,
     marginLeft: "auto",
+  },
+  circle: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
     borderColor: appColors.gray1,
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
   },
 });
