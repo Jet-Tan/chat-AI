@@ -8,12 +8,12 @@ import { appColors } from "../../constants/appColors";
 
 const ChatScreen = () => {
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <HeaderComponent />
       <View style={styles.chatWrapper}>
         <ChatComponent />
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

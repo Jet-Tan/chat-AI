@@ -1,17 +1,20 @@
-import { View, Text } from "react-native";
 import React from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
+import TabNavigator from "./TabNavigator";
+import DrawerCustom from "../components/DrawerCustom";
+
+const Drawer = createDrawerNavigator();
+
 const DrawerNavigator = () => {
-  const Drawer = createDrawerNavigator();
   return (
     <Drawer.Navigator
       screenOptions={{
         headerShown: false,
-        drawerPosition: "right",
+        drawerPosition: "left",
       }}
       drawerContent={(props) => <DrawerCustom {...props} />}
     >
-      <Drawer.Screen name="HomeNavigator" component={TabNavigator} />
+      <Drawer.Screen name="TabNavigator" component={TabNavigator} />
     </Drawer.Navigator>
   );
 };

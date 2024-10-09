@@ -42,6 +42,6 @@ const AppRouters = () => {
     return <LoadingIndicator />;
   }
 
-  return <>{auth.us_id ? <ChatNavigator /> : <AuthNavigator />}</>;
+  return <>{!auth.us_id ? <ChatNavigator /> : <AuthNavigator />}</>;
 };
 export default AppRouters;

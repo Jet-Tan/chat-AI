@@ -6,9 +6,8 @@ import VerificationFB from "../screens/AuthScreen/VerificationFB";
 
 import IntroScreen from "../screens/AuthScreen/IntroScreen";
 
-const Stack = createNativeStackNavigator();
-
 const AuthNavigator = () => {
+  const Stack = createNativeStackNavigator();
   return (
     <Stack.Navigator
       screenOptions={{

@@ -1,8 +1,10 @@
 // HeaderComponent.js
 import React from "react";
-import { StyleSheet, View, Image } from "react-native";
+import { StyleSheet, View, Image, TouchableOpacity } from "react-native";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { appColors } from "../constants/appColors";
 
-const HeaderComponent = () => {
+const HeaderComponent = ({ openDrawer }) => {
   return (
     <View style={styles.container}>
       <Image
@@ -10,6 +12,14 @@ const HeaderComponent = () => {
         style={styles.logo}
         resizeMode="contain"
       />
+
+      <TouchableOpacity
+        style={styles.menuButton}
+        accessibilityLabel="Menu"
+        onPress={openDrawer}
+      >
+        <FontAwesome5 name="bars" size={18} color={appColors.gray} />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -19,15 +29,24 @@ const styles = StyleSheet.create({
     position: "relative",
     height: 50,
     width: "100%",
-    backgroundColor: "#fff",
+    backgroundColor: appColors.white,
     borderBottomWidth: 1,
-    borderColor: "#ccc",
+    borderColor: appColors.gray1,
     justifyContent: "center",
     paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
   },
   logo: {
     height: 40,
     width: 100,
+  },
+  menuButton: {
+    padding: 10,
+    marginLeft: "auto",
+    borderRadius: 20,
+    borderColor: appColors.gray1,
+    borderWidth: 1,
   },
 });
 
