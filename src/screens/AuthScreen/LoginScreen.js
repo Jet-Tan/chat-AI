@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
   formContainer: {
     width: "100%",
     paddingHorizontal: 16,
-    flex: 0.45,
+    flex: 0.5,
   },
   formWrapper: {
     marginBottom: 16,

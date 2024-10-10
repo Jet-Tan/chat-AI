@@ -1,10 +1,9 @@
-// HeaderComponent.js
-import React from "react";
-import { StyleSheet, View, Image, TouchableOpacity } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { appColors } from "../constants/appColors";
 import { useNavigation } from "@react-navigation/native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import React from "react";
+import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { appColors } from "../constants/appColors";
 
 const HeaderComponent = ({ openDrawer }) => {
   const navigation = useNavigation();
@@ -18,14 +17,24 @@ const HeaderComponent = ({ openDrawer }) => {
       }}
     >
       <View style={styles.container}>
-        <TouchableOpacity onPress={() => navigation.navigate("HomeScreen")}>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => navigation.navigate("HomeScreen")}
+        >
           <Image
             source={require("../assets/images/logo.png")}
             style={styles.logo}
             resizeMode="contain"
           />
         </TouchableOpacity>
-
+        <TouchableOpacity style={styles.profileImageContainer}>
+          <Image
+            source={{
+              uri: "https://www.vietnamworks.com/hrinsider/wp-content/uploads/2023/12/hinh-thien-nhien-3d-005.jpg",
+            }}
+            style={styles.profileImage}
+          />
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.menuButton}
           accessibilityLabel="Menu"
@@ -45,22 +54,33 @@ const styles = StyleSheet.create({
     position: "relative",
     paddingHorizontal: 10,
     flexDirection: "row",
+    alignItems: "center",
   },
   logo: {
-    height: 40,
-    width: 120,
+    height: 50,
+    width: 140,
+  },
+  profileImageContainer: {
+    marginLeft: "auto",
+    marginRight: 10,
   },
   menuButton: {
-    marginLeft: "auto",
+    marginLeft: 0,
   },
   circle: {
-    width: 40,
-    height: 40,
+    width: 35,
+    height: 35,
     borderRadius: 20,
     borderColor: appColors.gray1,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
+  },
+  profileImage: {
+    height: 40,
+    width: 40,
+    borderRadius: 75,
+    resizeMode: "contain",
   },
 });
 
